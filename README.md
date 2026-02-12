@@ -49,3 +49,38 @@ This project reflects my interest in:
 
 It is also part of my transition toward a **software-oriented career**, with a strong focus on real-world, responsibility-driven applications.
 
+---
+
+## Getting Started (Bootstrap)
+
+### Requirements
+- Python 3.13
+- Git
+
+### 1) Clone the repository
+```bash
+git clone https://github.com/evhvl/Radioactive-Waste-Manager.git
+cd Radioactive-Waste-Manager
+```
+
+### 2) Create and activate a virtual environment (recommended)
+Windows
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
+macOS / Linux
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3) Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4) Run the application
+```bash
+python env.py
+```
