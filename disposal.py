@@ -125,21 +125,26 @@ def calc_date_below_limit(activity_mci, half_life_hours, limit_bq, start_date):
     return (start_date + timedelta(hours=t_hours)).strftime(DATE_FORMAT)
 
 def calc_recommended_and_permitted_date(radionuclide, activity_mci, stored_at, safety_factor=0.1):
-    if radionuclide not in DISPOSAL_LIMITS_BQ:
-        messagebox.showerror("Missing disposal limit", f"No disposal limit defined for {radionuclide}.")
-        return None, None, None
     start_date = datetime.strptime(stored_at, DATE_FORMAT)
     half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
     limit_bq = DISPOSAL_LIMITS_BQ[radionuclide]
+    if limit_bq in (None, 0):
+        recommended = (start_date + timedelta(days=60)).strftime(DATE_FORMAT)
+        permitted = (start_date + timedelta(days=60)).strftime(DATE_FORMAT)
+        return recommended, permitted, None
     permitted = calc_date_below_limit(activity_mci, half_life, limit_bq, start_date)
     recommended = calc_date_below_limit(activity_mci, half_life, limit_bq * safety_factor, start_date)
     return recommended, permitted, float(limit_bq)
 
 #=====STORE VIAL IN SQLITE+XLSX=====
 def store_vial(radionuclide, source_db, calibration_date, stored_at, activity_mci, permitted_date=None, recommended_date=None, limit_bq=None):
-    if permitted_date is None or recommended_date is None or limit_bq is None:
+    if permitted_date is None or recommended_date is None:
         recommended_date, permitted_date, limit_bq = calc_recommended_and_permitted_date(radionuclide, float(activity_mci), stored_at)
-    limit_mci = round(bq_to_mci(limit_bq), 2)
+    if recommended_date is None or permitted_date is None:
+        return None, None
+    limit_mci = None
+    if limit_bq not in (None, 0):
+        limit_mci = round(bq_to_mci(limit_bq), 2)
     batch_path = get_active_batch()
     db_path, xlsx_path = init_storage_files(batch_path)
     conn = sqlite3.connect(db_path)
@@ -276,4 +281,5 @@ def build_disposal_tab(parent_tab, *, on_back=None):
     summary_label.pack()
     if on_back:
         Button(parent_tab, text="Back", **TAB_BUTTON_STYLE, command=on_back).pack(pady=(0,10))
+
     load_active()
