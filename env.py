@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter import ttk
 import functions
-from functions import Functions
+from main import Tabs
 from constants import *
 
 # =====Create Window=====
@@ -44,7 +44,7 @@ canvas.create_image(350,450, image=test_img)
 main_text = canvas.create_text(400,30,text="MAIN MENU", font=(FONT_NAME,32,"bold"), fill="white")
 canvas.pack()
 
-func = Functions(window, tabs_frame, main_tab)
+func = Tabs(window, tabs_frame, main_tab)
 
 # =====Create Main Buttons=====
 insert_new_button = Button(button_frame, text="VIALS", **BUTTON_STYLE, command=lambda:func.create_new_tab("Vials"))
@@ -57,5 +57,6 @@ disposal_button = Button(button_frame, text="DISPOSAL", **BUTTON_STYLE, command=
 disposal_button.grid(column=0, row=3, padx=5, pady=5, sticky="w")
 exit_button = Button(button_frame, text="Exit", **{k:v for k,v in BUTTON_STYLE.items() if k not in ['width','height']}, width=12, height=1, command=quit)
 exit_button.grid(column=0, row=5, padx=0, pady=0, sticky="s")
+
 
 window.mainloop()
