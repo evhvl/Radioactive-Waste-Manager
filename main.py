@@ -36,6 +36,10 @@ class Tabs:
             vials.build_tab(self, new_tab, tab_name)
         elif tab_name == "Disposal":
             self._tab_disposal(new_tab)
+        elif tab_name == "Vials Disp":
+            disposal.build_vials_disposal_tab(new_tab, on_back=lambda: self.back_to_main(new_tab))
+        elif tab_name == "Tc99m Disp":
+            disposal.build_tc99m_disposal_tab(new_tab, on_back=lambda: self.back_to_main(new_tab))
 
     #=====CUSTOMIZE EACH TAB=====
     def _tab_vials(self, tab):
@@ -56,4 +60,8 @@ class Tabs:
         Button(tab, text="Back", **TAB_BUTTON_STYLE, command=lambda nt=tab: self.back_to_main(nt)).pack(pady=40)
 
     def _tab_disposal(self, tab):
-        disposal.build_disposal_tab(tab, on_back=lambda: self.back_to_main(tab))
+        frame = Frame(tab, bg=C4)
+        frame.pack(expand=True)
+        Button(frame, text="Vials", **GEN_BUTTON_STYLE, command=lambda: self.create_new_tab("Vials Disp")).grid(row=0, column=0, sticky="e", padx=20, pady=10)
+        Button(frame, text="Tc99m", **GEN_BUTTON_STYLE, command=lambda: self.create_new_tab("Tc99m Disp")).grid(row=0, column=1, sticky="w", padx=20, pady=10)
+        Button(tab, text="Back", **TAB_BUTTON_STYLE, command=lambda nt=tab: self.back_to_main(nt)).pack(pady=40)

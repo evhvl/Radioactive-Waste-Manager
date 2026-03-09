@@ -58,5 +58,4 @@ disposal_button.grid(column=0, row=3, padx=5, pady=5, sticky="w")
 exit_button = Button(button_frame, text="Exit", **{k:v for k,v in BUTTON_STYLE.items() if k not in ['width','height']}, width=12, height=1, command=quit)
 exit_button.grid(column=0, row=5, padx=0, pady=0, sticky="s")
 
-
 window.mainloop()

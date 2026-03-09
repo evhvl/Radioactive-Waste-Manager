@@ -1,4 +1,4 @@
-import sqlite3, disposal
+import string
 from functions import *
 from constants import *
 from tkinter import *
@@ -10,7 +10,7 @@ from typing import Optional
 
 def build_tab(app, tab, vial_name):
 
-    # Choose New or Old File
+    # =====Choose New or Old File=====
     def select_vial_file():
         popup_window = Toplevel(app.window)
         popup_window.title("Choose File")
@@ -29,7 +29,7 @@ def build_tab(app, tab, vial_name):
         Button(popup_window, text="New File", **TAB_BUTTON_STYLE, command=create_new).pack(pady=10)
         Button(popup_window, text="Old File", **TAB_BUTTON_STYLE, command=open_existing).pack()
 
-    # Create New File
+    # =====Create New File=====
     def new_vial_file():
         popup = Toplevel(app.window)
         popup.title(f"New {vial_name} Vial")
@@ -38,12 +38,12 @@ def build_tab(app, tab, vial_name):
         Label(popup, text=f"New {vial_name} Vial Info", **TEXT_COLORS, font=(FONT_NAME, 16, "bold")).pack(pady=10)
         info_frame = Frame(popup, bg=C4)
         info_frame.pack(pady=10)
-        Label(info_frame, text="Date:", **TEXT_COLORS).grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Calibration Date:", **TEXT_COLORS).grid(row=0, column=0, sticky="e", padx=5, pady=5)
         date_entry = DateEntry(info_frame, width=12, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         date_entry.grid(row=0, column=1, pady=5)
         time_field = Frame(info_frame, bg="white", highlightbackground="black", highlightthickness=0)
         time_field.grid(row=1, column=1, padx=5)
-        Label(info_frame, text="Time:", **TEXT_COLORS).grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Calibration Time:", **TEXT_COLORS).grid(row=1, column=0, sticky="e", padx=5, pady=5)
         time_entry = Entry(time_field, width=9, bd=0, font=(FONT_NAME, 10))
         time_entry.pack(side="left", padx=(3, 0), pady=2)
         update_time(time_entry)
@@ -83,29 +83,37 @@ def build_tab(app, tab, vial_name):
                 messagebox.showerror("Error", "Activity & Volume must be numbers!")
                 return
             conc = round(activity / volume, 2)
-            date = date_entry.get()
-            time = time_entry.get()
+            cal_date = date_entry.get()
+            cal_time = time_entry.get()
             exp_date = expiration_entry.get()
             base_dir = "Vials"
-            dt = datetime.strptime(date, "%d-%m-%Y")
+            dt = datetime.strptime(cal_date, "%d-%m-%Y")
             year = dt.strftime("%Y")
             month = dt.strftime("%m")
-            vial_dir = os.path.join(base_dir, vial_name, year, month, f"{vial_name}__{date}")
+            base_folder = os.path.join(base_dir, vial_name, year, month)
+            folder_name = f"{vial_name}__{cal_date}"
+            vial_dir = os.path.join(base_folder, folder_name)
+            if os.path.exists(vial_dir):
+                for letter in string.ascii_uppercase[1:]:
+                    folder_name = f"{vial_name}__{cal_date}__{letter}"
+                    vial_dir = os.path.join(base_folder, folder_name)
+                    if not os.path.exists(vial_dir):
+                        break
             os.makedirs(vial_dir, exist_ok=True)
-            db_path = os.path.join(vial_dir, f"{vial_name}__{date}.sqlite")
-            excel_path = os.path.join(vial_dir, f"{vial_name}__{date}.xlsx")
+            db_path = os.path.join(vial_dir, f"{folder_name}.sqlite")
+            excel_path = os.path.join(vial_dir, f"{folder_name}.xlsx")
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
             cur.execute(
-                """CREATE TABLE IF NOT EXISTS vial_info(date TEXT, time TEXT, activity REAL, volume REAL, concentration REAL, expiration_date TEXT, stored_date TEXT)""")
+                """CREATE TABLE IF NOT EXISTS vial_info(cal_date TEXT, cal_time TEXT, activity REAL, volume REAL, concentration REAL, expiration_date TEXT, stored_date TEXT, disposal_date TEXT)""")
             cur.execute(
-                """CREATE TABLE IF NOT EXISTS patient_info(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, time TEXT, patient_name TEXT, concentration REAL, dose_planned REAL, volume_planned REAL, dose_actual REAL, volume_actual REAL, volume_left REAL)""")
-            cur.execute("""INSERT INTO vial_info VALUES (?,?,?,?,?,?,NULL)""",
-                        (date, time, activity, volume, conc, exp_date))
+                """CREATE TABLE IF NOT EXISTS patient_info(id INTEGER PRIMARY KEY AUTOINCREMENT, cal_date TEXT, cal_time TEXT, patient_name TEXT, concentration REAL, dose_planned REAL, volume_planned REAL, dose_actual REAL, volume_actual REAL, volume_left REAL)""")
+            cur.execute("""INSERT INTO vial_info VALUES (?,?,?,?,?,?,NULL,NULL)""",
+                        (cal_date, cal_time, activity, volume, conc, exp_date))
             conn.commit()
             conn.close()
             create_excel_for_vial(excel_path)
-            append_row_to_sheet(excel_path, "Vial Info", [date, time, activity, volume, conc, exp_date, ""])
+            append_row_to_sheet(excel_path, "Vial Info", [cal_date, cal_time, activity, volume, conc, exp_date, "", ""])
             popup.destroy()
             load_vial(db_path)
 
@@ -119,7 +127,7 @@ def build_tab(app, tab, vial_name):
                font=(FONT_NAME, 10, "bold"),
                command=lambda: (popup.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Vials"))).grid(row=0, column=1, padx=10, pady=10)
 
-    # Open Old File
+    # =====Open Old File=====
     def existing_vial_file():
         popup = Toplevel(app.window)
         popup.title(f"Open Existing {vial_name} Vial File")
@@ -152,7 +160,7 @@ def build_tab(app, tab, vial_name):
                height=2, font=(FONT_NAME, 12, "bold"),
                command=lambda: (popup.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Vials"))).grid(row=0, column=1, padx=10, pady=10)
 
-    #Load Tab
+    # =====Load Tab=====
     def load_vial(dbfile):
         for widget in tab.winfo_children():
             widget.destroy()
@@ -160,7 +168,7 @@ def build_tab(app, tab, vial_name):
         header.pack(pady=(5, 0), fill="x")
         conn = sqlite3.connect(dbfile)
         cur = conn.cursor()
-        date, time, activity, volume, conc, exp_date, stored_date = cur.execute("SELECT * FROM vial_info").fetchone()
+        date, time, activity, volume, conc, exp_date, stored_date, disposal_date = cur.execute("SELECT * FROM vial_info").fetchone()
         exp_dt = datetime.strptime(exp_date, "%d-%m-%Y")
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         is_stored = False
@@ -168,19 +176,21 @@ def build_tab(app, tab, vial_name):
             stored_dt = datetime.strptime(stored_date, "%d-%m-%Y")
             if today >= stored_dt:
                 is_stored = True
+                if disposal_date:
+                    disposal_dt = datetime.strptime(disposal_date, "%d-%m-%Y")
         is_expired = today > exp_dt
         if is_stored or is_expired:
             messagebox.showerror("Vial Disposed/Expired","This vial has reached its disposal/expiration date.\nNo further administrations are allowed.")
         half_life = next(hl for name, hl in VIAL_DATA if name == vial_name)
         info_frame = Frame(tab, bg=C4)
         info_frame.pack(anchor="center", pady=20)
-        Label(info_frame, text=f"Date: {date}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=0, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Calibration on: {date} {time}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=6, pady=6)
         Label(info_frame, text=f"Activity (mCi): {activity}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, padx=6, pady=6)
         Label(info_frame, text=f"Conc (mCi/ml): {conc}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=2, column=0, padx=6, pady=6)
         Label(info_frame, text=f"T1/2 {vial_name} (HR): {half_life}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=0, column=1, padx=6, pady=6)
         Label(info_frame, text=f"Expiration Date: {exp_date}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=1, column=1, padx=6, pady=6)
 
-        # Store Vial
+        # =====Store Vial=====
         def store_current_vial():
             if not messagebox.askyesno("Store Vial","Are you sure you want to store this vial for disposal?\nNo further administrations will be allowed."):
                 return
@@ -197,7 +207,7 @@ def build_tab(app, tab, vial_name):
             decay_factor = math.exp(-math.log(2) * delta_minutes / (half_life * 60))
             current_conc = float(conc) * decay_factor
             calculated_activity_mci = round(current_conc * volume_left_now, 2)
-            #(Residual Popup)
+            #Residual Popup
             popup = Toplevel(tab)
             popup.title("Enter Residual")
             popup.config(bg=C4, pady=12, padx=13)
@@ -235,10 +245,10 @@ def build_tab(app, tab, vial_name):
                 return
             current_activity_mci = final_activity
             stored_at = datetime.now().strftime("%d-%m-%Y")
-            recommended, permitted, limit_bq = disposal.calc_recommended_and_permitted_date(vial_name, current_activity_mci, stored_at)
+            recommended, permitted, limit_bq = calc_recommended_and_permitted_date(vial_name, current_activity_mci, stored_at)
             if recommended is None or permitted is None:
                 return
-            disposal.store_vial(radionuclide=vial_name, source_db=dbfile, calibration_date=date, stored_at=stored_at,
+            store_vial(radionuclide=vial_name, source_db=dbfile, calibration_date=date, stored_at=stored_at,
                                 activity_mci=current_activity_mci, permitted_date=permitted,
                                 recommended_date=recommended, limit_bq=limit_bq)
             cur.execute("UPDATE vial_info SET stored_date=?", (stored_at,))
@@ -256,7 +266,7 @@ def build_tab(app, tab, vial_name):
         dispose_button.grid(row=2, column=1, padx=6, pady=6)
 
         # Table
-        columns = [("date", "Date", 120), ("time", "Time", 100), ("patient_name", "Patient", 160),
+        columns = [("cal_date", "Date", 120), ("cal_time", "Time", 100), ("patient_name", "Patient", 160),
                    ("concentration", "Conc(mCi/ml)", 120), ("dose", "Dose(mCi)", 100), ("volume", "Vol(ml)", 90),
                    ("volume_left", "Vol Left(ml)", 100)]
         tree = ttk.Treeview(tab, columns=[c[0] for c in columns], show="headings", height=8)
@@ -274,21 +284,18 @@ def build_tab(app, tab, vial_name):
                   foreground=[("selected", "black")])
         style.layout("Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
 
-        # Load Old Data
+        # =====Load Old Data=====
         rows = cur.execute(
-            "SELECT id,date,time,patient_name,concentration,dose_planned,volume_planned,dose_actual,volume_actual,volume_left FROM patient_info").fetchall()
+            "SELECT id, cal_date, cal_time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left FROM patient_info").fetchall()
         for r in rows:
             row_id = r[0]
             (date, time, patient, conc, dose_p, vol_p, dose_a, vol_a, vol_left) = r[1:]
-            dose_txt = f"{dose_p:.2f}" if dose_p is not None else "-"
-            vol_txt = f"{vol_p:.2f}" if vol_p is not None else "-"
-            if dose_a is not None:
-                dose_txt += f" → {dose_a:.2f}"
-            if vol_a is not None:
-                vol_txt += f" → {vol_a:.2f}"
+            dose_txt = f"{dose_a:.2f}" if dose_a is not None else f"{dose_p}"
+            vol_txt = f"{vol_a:.2f}" if vol_a is not None else f"{vol_p}"
             tree.insert("", "end", iid=row_id, values=(date, time, patient, f"{conc:.2f}" if conc is not None else "-", dose_txt, vol_txt,
                                                                     f"{vol_left:.2f}" if vol_left is not None else "-"))
-        # Add New Data
+
+        # =====Add New Data=====
         add_frame = Frame(tab, bg=C4)
         add_frame.pack(pady=10)
         Label(add_frame, text="Date:", **TEXT_COLORS).grid(row=0, column=0)
@@ -311,6 +318,32 @@ def build_tab(app, tab, vial_name):
         dose_entry = Entry(add_frame, width=8)
         dose_entry.grid(row=0, column=7, padx=5)
 
+        # =====Update Volume Left After Delete/Change=====
+        def update_volume_after_delete_or_change():
+            start_volume = float(cur.execute("SELECT volume FROM vial_info").fetchone()[0])
+            rows = cur.execute(
+                """SELECT id, volume_planned, volume_actual FROM patient_info ORDER BY id""").fetchall()
+            current_vol_left = start_volume
+            for rid, vol_p_db, vol_a_db in rows:
+                used = vol_a_db if vol_a_db is not None else vol_p_db
+                used = float(used) if used is not None else 0.0
+                current_vol_left = round(current_vol_left - used, 1)
+                if current_vol_left < 0:
+                    current_vol_left = 0.0
+                cur.execute("UPDATE patient_info SET volume_left=? WHERE id=?", (current_vol_left, rid))
+            conn.commit()
+            folder = os.path.dirname(dbfile)
+            excel_path = os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
+            wb = load_workbook(excel_path)
+            ws = wb["Administrations"]
+            excel_row_map = {str(row[0].value): row[0].row for row in ws.iter_rows(min_row=2)}
+            for rid, _, _ in rows:
+                left_val = cur.execute("SELECT volume_left FROM patient_info WHERE id=?", (rid,)).fetchone()[0]
+                key = str(rid)
+                if key in excel_row_map:
+                    ws.cell(row=excel_row_map[key], column=8, value=left_val)
+            wb.save(excel_path)
+
         #Save New Data
         def add_record():
             if not patient_name_entry.get().strip():
@@ -328,9 +361,6 @@ def build_tab(app, tab, vial_name):
             admin_dt = datetime.strptime(f"{admin_date} {admin_time}", "%d-%m-%Y %H:%M")
             vial_dt = datetime.strptime(f"{date} {time}", "%d-%m-%Y %H:%M")
             delta_minutes = (admin_dt - vial_dt).total_seconds() / 60
-            if delta_minutes < 0:
-                messagebox.showerror("Error", "Administration Time cannot be before Vial Calibration.")
-                return
             decay_factor = math.exp(-math.log(2) * delta_minutes / (half_life * 60))
             updated_conc = round(conc * decay_factor, 2)
             dose_volume = round(dose / updated_conc, 1)
@@ -343,7 +373,7 @@ def build_tab(app, tab, vial_name):
             if volume_left < 0:
                 messagebox.showerror("Error", "Not enough volume left in Vial.")
                 return
-            cur.execute("INSERT INTO patient_info (date, time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left)"
+            cur.execute("INSERT INTO patient_info (cal_date, cal_time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left)"
                         " VALUES (?,?,?,?,?,?,?,?,?)",
                 (admin_date, admin_time, patient_name_entry.get().strip(), updated_conc, dose, dose_volume, None, None,
                  volume_left))
@@ -351,62 +381,72 @@ def build_tab(app, tab, vial_name):
             row_id = cur.lastrowid
             tree.insert("", "end", iid=row_id, values=(admin_date, admin_time, patient_name_entry.get().strip(), f"{updated_conc:.2f}", dose,
                                                                     f"{dose_volume:.1f}", f"{volume_left:.1f}"))
+            folder = os.path.dirname(dbfile)
+            excel_path = os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
+            append_row_to_sheet(excel_path, "Administrations",
+                                [row_id, admin_date, admin_time, patient_name_entry.get(), updated_conc,
+                                 dose, dose_volume, volume_left])
 
             #Enter + Save Corrected Dose + Volume
             def on_double_click(event):
                 selected = tree.selection()
                 if not selected:
                     return
-                row_id = int(selected[0])
                 popup = Toplevel(tab)
                 popup.title("Insert Actual Administration Values")
                 popup.config(bg=C4, pady=15)
-                center_window(popup, 250, 150)
+                center_window(popup, 250, 120)
                 Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=10, pady=5)
                 dose_actual_entry = Entry(popup, width=8)
                 dose_actual_entry.insert(0, f"{dose}")
                 dose_actual_entry.grid(row=0, column=1)
-                Label(popup, text="Actual Volume (ml):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, padx=10, pady=5)
-                volume_actual_entry = Entry(popup, width=8)
-                volume_actual_entry.insert(0, f"{dose_volume}")
-                volume_actual_entry.grid(row=1, column=1)
 
                 def save_actual():
+                    row_id = int(selected[0])
                     try:
                         dose_actual = float(dose_actual_entry.get())
-                        volume_actual = float(volume_actual_entry.get())
                     except ValueError:
-                        messagebox.showerror("Error", "Invalid values.")
+                        messagebox.showerror("Error", "Invalid dose.")
                         return
-                    prev = cur.execute("""SELECT volume_left FROM patient_info WHERE id < ? ORDER BY id DESC LIMIT 1""",
-                                       (row_id,)).fetchone()
-                    prev_left = prev[0] if prev else volume
-                    new_left = round(prev_left - volume_actual, 1)
-                    if new_left < 0:
-                        messagebox.showerror("Error", "Not enough volume left.")
+                    row_conc = cur.execute("SELECT concentration FROM patient_info WHERE id=?", (row_id,)).fetchone()
+                    conc_now = float(row_conc[0])
+                    if conc_now <= 0:
+                        messagebox.showerror("Error", "Concentration mush be > 0.")
                         return
-                    cur.execute("""UPDATE patient_info SET dose_actual=?, volume_actual=?, volume_left=? WHERE id=?""",
-                                (dose_actual, volume_actual, new_left, row_id))
+                    volume_actual = round(dose_actual / conc_now, 2)
+                    cur.execute("""UPDATE patient_info SET dose_actual=?, volume_actual=? WHERE id=?""",
+                                (dose_actual, volume_actual, row_id))
                     conn.commit()
-                    planned = cur.execute("""SELECT dose_planned, volume_planned FROM patient_info WHERE id=?""",
-                                          (row_id,)).fetchone()
-                    tree.item(row_id, values=(tree.item(row_id, "values")[0], tree.item(row_id, "values")[1],
-                                              tree.item(row_id, "values")[2], tree.item(row_id, "values")[3],
-                                              f"{planned[0]:.2f} → {dose_actual:.2f}",
-                                              f"{planned[1]:.2f} → {volume_actual:.2f}", f"{new_left:.2f}"))
+                    update_volume_after_delete_or_change()
                     folder = os.path.dirname(dbfile)
                     excel_path = os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
-                    append_row_to_sheet(excel_path, "Administrations",
-                                        [row_id, admin_date, admin_time, patient_name_entry.get(), updated_conc,
-                                         f"{dose} → {dose_actual}", f"{dose_volume} → {volume_actual}", new_left])
+                    wb = load_workbook(excel_path)
+                    ws = wb["Administrations"]
+                    for row in ws.iter_rows(min_row=2):
+                        if str(row[0].value) == str(row_id):
+                            row[5].value = dose_actual
+                            row[6].value = volume_actual
+                            break
+                    wb.save(excel_path)
+                    tree.delete(*tree.get_children())
+                    rows = cur.execute(
+                        "SELECT id, cal_date, cal_time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
+                    for r in rows:
+                        rid = r[0]
+                        (date_v, time_v, patient, conc_v, dose_p, vol_p, dose_a, vol_a, vol_left) = r[1:]
+                        dose_txt = f"{dose_a:.2f}" if dose_a is not None else f"{dose_p}"
+                        vol_txt = f"{vol_a:.2f}" if vol_a is not None else f"{vol_p}"
+                        tree.insert("", "end", iid=rid,
+                                    values=(date_v, time_v, patient, f"{conc_v:.2f}", dose_txt, vol_txt,
+                                            f"{vol_left:.2f}" if vol_left is not None else "-"))
                     popup.destroy()
 
                 Button(popup, text="OK", command=save_actual,
                        **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                       width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=2, column=0, pady=10, padx=6)
+                       width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, pady=10, padx=6)
                 Button(popup, text="Cancel", command=popup.destroy,
                        **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['bg', 'width', 'height', 'font']},
-                       bg=C4, width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=2, column=1, pady=10, padx=6)
+                       bg=C4, width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=1, column=1, pady=10, padx=6)
 
             tree.bind("<Double-1>", on_double_click)
             dose_entry.delete(0, "end")
@@ -416,31 +456,8 @@ def build_tab(app, tab, vial_name):
                             width=5, height=1, font=(FONT_NAME, 10, "bold"))
         add_button.grid(row=0, column=8, padx=6)
 
-        # Update Volume Left After Delete
-        def update_volume_after_delete():
-            start_volume = float(cur.execute("SELECT volume FROM vial_info").fetchone()[0])
-            rows = cur.execute("""SELECT id, volume_planned, volume_actual FROM patient_info ORDER BY id""").fetchall()
-            current_vol_left = start_volume
-            for rid, vol_p_db, vol_a_db in rows:
-                used = vol_a_db if vol_a_db is not None else vol_p_db
-                used = float(used) if used is not None else 0.0
-                current_vol_left = round(current_vol_left - used, 1)
-                if current_vol_left < 0:
-                    current_vol_left = 0.0
-                cur.execute("UPDATE patient_info SET volume_left=? WHERE id=?", (current_vol_left, rid))
-            conn.commit()
-            folder = os.path.dirname(dbfile)
-            excel_path = os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
-            wb = load_workbook(excel_path)
-            ws = wb["Administrations"]
-            excel_row_map = {row[0].value: row[0].row for row in ws.iter_rows(min_row=2)}
-            for rid, _, _ in rows:
-                left_val = cur.execute("SELECT volume_left FROM patient_info WHERE id=?", (rid,)).fetchone()[0]
-                if rid in excel_row_map:
-                    ws.cell(row=excel_row_map[rid], column=8, value=left_val)
-            wb.save(excel_path)
 
-        #Delete Data
+        # =====Delete Data=====
         def delete_record():
             selected = tree.selection()
             if not selected:
@@ -460,18 +477,14 @@ def build_tab(app, tab, vial_name):
                     ws.delete_rows(row[0].row)
                     break
             wb.save(excel_path)
-            update_volume_after_delete()
+            update_volume_after_delete_or_change()
             tree.delete(*tree.get_children())
-            rows = cur.execute("SELECT id, date, time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
+            rows = cur.execute("SELECT id, cal_date, cal_time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
             for r in rows:
                 row_id = r[0]
                 (date, time, patient, conc, dose_p, vol_p, dose_a, vol_a, vol_left) = r[1:]
-                dose_txt = f"{dose_p:.1f}" if dose_p is not None else "-"
-                vol_txt = f"{vol_p:.1f}" if vol_p is not None else "-"
-                if dose_a is not None:
-                    dose_txt += f" → {dose_a:.1f}"
-                if vol_a is not None:
-                    vol_txt += f" → {vol_a:.1f}"
+                dose_txt = f"{dose_a:.2f}" if dose_a is not None else f"{dose_p}"
+                vol_txt = f"{vol_a:.2f}" if vol_a is not None else f"{vol_p}"
                 tree.insert("", "end", iid=row_id, values=(date, time, patient, f"{conc:.2f}" if conc is not None else "-", dose_txt, vol_txt,
                                                                         f"{vol_left:.2f}" if vol_left is not None else "-"))
 
@@ -480,16 +493,19 @@ def build_tab(app, tab, vial_name):
                width=5, height=1, font=(FONT_NAME, 10, "bold")).grid(row=0, column=9, padx=6)
 
         # ----
-        if is_expired:
-            Label(tab, text="⚠ VIAL EXPIRED – NO ADMINISTRATION ALLOWED", fg="red", bg=C4,
-                  font=(FONT_NAME, 11, "bold")).pack(pady=(5, 0))
+        if is_expired and not stored_date and not disposal_date:
+            Label(tab, text="⚠ VIAL EXPIRED – NO ADMINISTRATION ALLOWED", fg="#FF8000", bg=C4, borderwidth=1,
+                  font=(FONT_NAME, 14, "bold")).pack(pady=(5, 0))
             disable_buttons(tab, exempt_texts=["Back", "✗Store Vial✗"])
-        if stored_date:
-            Label(tab, text=f"⚠ VIAL STORED ({stored_date})-NO FURTHER ACTIONS ALLOWED", fg="red", bg=C4,
-                  font=(FONT_NAME, 11, "bold"), justify="center").pack(pady=(5, 0))
+        elif stored_date and not disposal_date:
+            Label(tab, text=f"⚠ VIAL STORED ({stored_date})-NO FURTHER ACTIONS ALLOWED", fg="#CC0000", bg=C4, borderwidth=1,
+                  font=(FONT_NAME, 14, "bold"), justify="center").pack(pady=(5, 0))
             disable_buttons(tab, exempt_texts=["Back"])
+        elif disposal_date:
+            Label(tab, text=f"⚠ VIAL DISPOSED ({disposal_date})-NO FURTHER ACTIONS ALLOWED", fg="#660000", bg=C4, borderwidth=1,
+                  font=(FONT_NAME, 14, "bold"), justify="center").pack(pady=(5, 0))
 
-        # Main Buttons
+        # =====Main Buttons=====
         btn_frame = Frame(tab, bg=C4)
         btn_frame.pack(pady=(20, 0))
         Button(btn_frame, text="Back", **TAB_BUTTON_STYLE, command=lambda nt=tab: app.back_to_main(nt)).pack()

@@ -1,4 +1,4 @@
-import math
+import math, os
 
 #=====Customization=====}
 C1, C2, C3, C4, BG, FONT_NAME = "#b2d8d8", "#66b2b2", "#008080", "#006666", "#004c4c", "Times"
@@ -50,7 +50,19 @@ VIAL_DATA = [("51-Cr",664.86), ("59-Fe",1067.9), ("67-Ga",78.3), ("89-Sr",1212.7
              ("123-I",13.27), ("125-I",1425.6), ("131-I",192.5), ("153-Sm",46.5), ("186-Re",89.2), ("201-Tl",72.9)]
 
 #=====Disposal=====
-DISPOSAL_LIMITS_BQ = {"51-Cr": 1e7, "59-Fe": 1e6, "89-Sr": 1e6, "90-Y":  1e5, "111-In": 1e6, "123-I": 1e7,
+DATE_FORMAT = "%d-%m-%Y"
+HOUR_FORMAT = "%H:%M"
+DISPOSAL_ROOT = "Disposals"
+DISPOSALS_LOG_DIR = os.path.join(DISPOSAL_ROOT, "Logs")
+VIALS_STORAGE_DIR = os.path.join(DISPOSALS_LOG_DIR, "Vials")
+VIALS_DB = os.path.join(VIALS_STORAGE_DIR, "storage.sqlite")
+VIALS_XLSX = os.path.join(VIALS_STORAGE_DIR, "storage.xlsx")
+TC99M_DIR = os.path.join(DISPOSAL_ROOT, "Tc99m")
+TC99M_REGISTRY_DB = os.path.join(TC99M_DIR, "registry.sqlite")
+DAILY_DISPOSALS_DIR = os.path.join(DISPOSALS_LOG_DIR, "Daily Disposals")
+DAILY_LOG_DB = os.path.join(DAILY_DISPOSALS_DIR, "daily_disposals.sqlite")
+TC99M_NUCLIDE = "Tc99m"
+DISPOSAL_LIMITS_BQ = {"51-Cr": 1e7, "59-Fe": 1e6, "67-Ga": None, "89-Sr": 1e6, "90-Y":  1e5, "111-In": 1e6, "123-I": 1e7,
                       "125-I": 1e6, "131-I": 1e6, "153-Sm": 1e6, "186-Re": 1e6, "201-Tl": 1e6,}
 
 #=====Kits=====

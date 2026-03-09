@@ -1,4 +1,6 @@
+import math
 import tkinter
+from tkinter.messagebox import showerror
 from functions import *
 from disposal import *
 from tkinter import *
@@ -8,7 +10,7 @@ from pathlib import Path
 
 def build_tab(app, tab):
 
-    # Choose New or Old File
+    # =====Choose New or Old File=====
     def select_file():
         popup_window = Toplevel(app.window)
         popup_window.title("Choose File")
@@ -28,7 +30,7 @@ def build_tab(app, tab):
         Button(popup_window, text="New File", **TAB_BUTTON_STYLE, command=create_new).pack(pady=10)
         Button(popup_window, text="Old File", **TAB_BUTTON_STYLE, command=open_existing).pack()
 
-    # Create New File
+    # =====Create New File=====
     def new_generator_file():
         popup_window = Toplevel(app.window)
         popup_window.title("New Tc99m Generator")
@@ -100,18 +102,18 @@ def build_tab(app, tab):
             db_path = os.path.join(gen_dir, f"{folder_name}.sqlite")
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
-            cur.execute("""CREATE TABLE IF NOT EXISTS generator_info(id TEXT PRIMARY KEY, cal_date TEXT, cal_time TEXT, mo_activity REAL, start_date TEXT, expiration_date TEXT, disposal_date TEXT)""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS generator_info(id TEXT PRIMARY KEY, cal_date TEXT, cal_time TEXT, mo_activity REAL, start_date TEXT, expiration_date TEXT, stored_date TEXT, disposal_date TEXT, cal_factor REAL)""")
             cur.execute("""CREATE TABLE IF NOT EXISTS elutions(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, time TEXT, tc_activity REAL, expected_activity REAL, 
                                                                div REAL, volume REAL, concentration REAL, mo_activity REAL)""")
             cur.execute("""CREATE TABLE IF NOT EXISTS kits(id TEXT PRIMARY KEY, parent_id TEXT, date TEXT, time TEXT, kit TEXT, volume REAL, activity REAL,
-                                                            concentration REAL, dose REAL, dose_volume REAL, volume_left REAL, patient_name TEXT)""")
-            cur.execute("INSERT INTO generator_info VALUES (?,?,?,?,?,?,?)",
-                        (gen_id, cal_date, cal_time, activity, start_date_entry.get(), expiration_date_entry.get(), None))
+                                                            concentration REAL, elution TEXT, dose REAL, dose_volume REAL, volume_left REAL, patient_name TEXT)""")
+            cur.execute("INSERT INTO generator_info VALUES (?,?,?,?,?,?,?,?,?)",
+                        (gen_id, cal_date, cal_time, activity, start_date_entry.get(), expiration_date_entry.get(), None, None, 1.0))
             conn.commit()
             excel_path = os.path.join(gen_dir, f"{folder_name}.xlsx")
             create_excel_for_tc99m(excel_path)
             append_row_to_sheet(excel_path, "Gen Info",
-                                [gen_id, cal_date, cal_time, activity, start_date, expiration_date, ""])
+                                [gen_id, cal_date, cal_time, activity, start_date, expiration_date, "", ""])
             conn.close()
             popup_window.destroy()
             load_generator(db_path)
@@ -124,18 +126,17 @@ def build_tab(app, tab):
         Button(bttn_frame, text="Back", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=8, height=1, font=(FONT_NAME, 10, "bold"),
                command=lambda: (popup_window.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Generators"))).grid(row=0, column=1, padx=10, pady=10)
 
-    # Open Existing File
+    # =====Open Existing File=====
     def existing_generator_file():
         popup_window = Toplevel(app.window)
         popup_window.title("Open Existing Tc99m Generator")
         popup_window.config(bg=C4)
         center_window(window=popup_window, w=360, h=130)
-        Label(popup_window, text="Select Existing Generator Folder", **TEXT_COLORS, font=(FONT_NAME, 17, "bold")).pack(
-            pady=10)
+        Label(popup_window, text="Select Existing Generator Folder", **TEXT_COLORS, font=(FONT_NAME, 17, "bold")).pack(pady=10)
 
         def open_folder():
-            ga68_root = Path(__file__).resolve().parent / "Tc99m_Generators"
-            initial_dir = max((p for p in ga68_root.rglob("*") if p.is_dir()), key=lambda p: p.stat().st_mtime).parent
+            tc99m_root = Path(__file__).resolve().parent / "Tc99m_Generators"
+            initial_dir = max((p for p in tc99m_root.rglob("*") if p.is_dir()), key=lambda p: p.stat().st_mtime).parent
             folder = filedialog.askdirectory(title="Select Tc99m Generator Folder", initialdir=initial_dir)
             if not folder:
                 return
@@ -160,18 +161,13 @@ def build_tab(app, tab):
         Button(button_frame, text="Back", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=12, height=2,
                font=(FONT_NAME, 12, "bold"), command=lambda: (popup_window.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Generators"))).grid(row=0, column=1, padx=10, pady=10)
 
-    # Load Selected Generator
+    # =====Load Selected Generator=====
     def load_generator(dbfile):
         for widget in tab.winfo_children():
             widget.destroy()
         conn = sqlite3.connect(dbfile)
         cur = conn.cursor()
-        gen_id, cal_date, cal_time, activity, start_date, expiration_date, disposal_date = cur.execute(
-            "SELECT * FROM generator_info").fetchone()
-        is_disposed = disposal_date is not None
-        today = datetime.now().date()
-        exp_date = datetime.strptime(expiration_date, "%d-%m-%Y").date()
-        is_expired = today > exp_date
+        gen_id, cal_date, cal_time, activity, start_date, expiration_date, stored_date, disposal_date, cal_factor = cur.execute("SELECT * FROM generator_info").fetchone()
         header = Label(tab, text="Daily Tc99m Generator Elution Log Sheet", fg="white", bg=C4,
                        font=(FONT_NAME, 18, "bold"))
         header.pack(pady=(5, 0), fill="x")
@@ -187,12 +183,31 @@ def build_tab(app, tab):
         Label(info_frame, text=f"T1/2 Mo99 (HR): {T12_MO99}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=0, column=1, padx=6, pady=6)
         Label(info_frame, text=f"T1/2 Tc99m (HR): {T12_TC99M}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=1, column=1, padx=6, pady=6)
         Label(info_frame, text=f"Expiration Date: {expiration_date}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=2, column=1, padx=6, pady=6)
-        dispose_button = Button(info_frame, text="✗Dispose Gen✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                                width=14, height=1, font=(FONT_NAME, 10, "bold"), command=lambda: dispose_gen(conn=conn, dbfile=dbfile,
-                                on_disposed_callback=update_header_and_disable(header=header, tab=tab)))
-        dispose_button.grid(row=3, column=1, padx=6, pady=6)
-        if is_disposed or is_expired:
-            update_header_and_disable(header=header, tab=tab, is_disposed=is_disposed, is_expired=is_expired)
+        action_button = Button(info_frame, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
+                                width=14, height=1, font=(FONT_NAME, 10, "bold"))
+        action_button.grid(row=3, column=1, padx=6, pady=6)
+        def configure_action_button():
+            cur.execute("SELECT stored_date, disposal_date, expiration_date FROM generator_info ORDER BY rowid DESC LIMIT 1")
+            row = cur.fetchone()
+            if not row:
+                action_button.config(state="disabled")
+                return
+            stored_date_db, disposal_date_db, expiration_date_db = row
+            is_stored_db = stored_date_db is not None
+            is_disposed_db = disposal_date_db is not None
+            exp_date_db = datetime.strptime(expiration_date_db, "%d-%m-%Y").date()
+            is_expired_db = datetime.now().date() > exp_date_db
+            if is_disposed_db or is_expired_db:
+                update_header_and_disable(cur=cur, header=header, tab=tab, is_stored=is_stored_db, is_disposed=is_disposed_db, is_expired=is_expired_db)
+            if (not is_stored_db) and (not is_disposed_db):
+                action_button.config(text="✗Store Gen✗", state="normal", command=lambda: store_gen(conn=conn, dbfile=dbfile, on_store_callback=configure_action_button))
+                return
+            if is_stored_db and not is_disposed_db:
+                action_button.config(text="✗Dispose Gen✗", state="normal",
+                                    command=lambda: dispose_gen(conn=conn, dbfile=dbfile, on_disposed_callback=lambda: (update_header_and_disable(cur=cur, header=header, tab=tab, is_disposed=True), configure_action_button())))
+                return
+            action_button.config(state="disabled")
+        configure_action_button()
         # Elutions Table
         columns = [("date", "Date", 120), ("time", "Time", 100), ("activity", "Activity(mCi)", 120),
                    ("expected_activity", "Expected(mCi)", 120),
@@ -208,14 +223,16 @@ def build_tab(app, tab):
         style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 11, "bold"), relief="solid")
         style.map("Treeview", background=[("selected", "#8FAADC"), ("!selected", C2)], foreground=[("selected", "black")])
         style.layout("Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
-        # Load Old Data
+
+        # =====Load Old Data=====
         rows = cur.execute(
             "SELECT id, date, time, tc_activity, expected_activity, div, volume, concentration FROM elutions").fetchall()
         for r in rows:
             row_id = r[0]
             data = r[1:]
             tree.insert("", "end", iid=row_id, values=data)
-        # Add New Elution
+
+        # =====Add New Elution=====
         add_frame = Frame(scroll_frame, bg=C4)
         add_frame.pack(pady=10)
         Label(add_frame, text="Date:", **TEXT_COLORS).grid(row=0, column=0)
@@ -273,7 +290,6 @@ def build_tab(app, tab):
                     ref_dt = datetime.strptime(f"{last_date} {last_time}", "%d-%m-%Y %H:%M")
                     dt_build = (elution_dt - ref_dt).total_seconds() / 3600.0
                 else:
-                    ref_dt = cal_dt
                     dt_build = (elution_dt - cal_dt).total_seconds() / 3600.0
                 if dt_build < 0:
                     dt_build = abs(dt_build)
@@ -283,9 +299,11 @@ def build_tab(app, tab):
                 # --- helper Tc99_lab ---
                 tc99_lab = tc99_lab_from_mo(mo_now, dt_build)
                 # --- helper functions ---
-                K_RED = 0.8742  # Change this factor for standard deviation!!
-                CAL_FACTOR = 0.88
-                tc_expected = round(tc99_lab * K_RED * CAL_FACTOR, 2)
+                YIELD_TC = 0.874
+                expected_model = tc99_lab * YIELD_TC
+                cur.execute("SELECT COALESCE(cal_factor, 1.0) FROM generator_info ORDER BY rowid DESC LIMIT 1")
+                cal_factor = float(cur.fetchone()[0])
+                tc_expected = round(expected_model * cal_factor, 2)
                 div = round(((a - tc_expected) / tc_expected) * 100, 1) if tc_expected > 0 else 0
                 cur.execute("INSERT INTO elutions (date, time, tc_activity, expected_activity, div, volume, concentration, mo_activity) VALUES (?,?,?,?,?,?,?,?)",
                             (d, t, a, tc_expected, div, v, conc, round(mo_now, 2)))
@@ -304,7 +322,34 @@ def build_tab(app, tab):
         Button(add_frame, text="Add", command=add_record, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                width=5, height=1, font=(FONT_NAME, 10, "bold")).grid(row=0, column=8, padx=6)
 
-        # Delete Record
+        #=====Calibrate Factor/Συντελεστής Κανονικοποίησης=====
+        def auto_calibrate_factor(n=2):
+            cur.execute("SELECT COALESCE(cal_factor, 1.0) FROM generator_info ORDER BY rowid DESC LIMIT 1")
+            current_factor = float(cur.fetchone()[0])
+            cur.execute("SELECT tc_activity, expected_activity FROM elutions ORDER BY rowid DESC LIMIT ?", (n,))
+            rows = cur.fetchall()
+            ratios = []
+            for measured, expected in rows:
+                if expected and expected > 0:
+                    expected_model = expected / current_factor if current_factor != 0 else expected
+                    if expected_model > 0:
+                        ratios.append(measured / expected_model)
+            if len(ratios) < 3:
+                messagebox.showwarning("Warning", "Auto Calibrate Factor needs at least 3 elutions to be calculated.")
+                return
+            ratios.sort()
+            mid = len(ratios) // 2
+            median_ratio = ratios[mid] if len(ratios) % 2 == 1 else (ratios[mid - 1] + ratios[mid]) / 2
+            cur.execute(
+                "UPDATE generator_info SET cal_factor = ? WHERE rowid = (SELECT rowid FROM generator_info ORDER BY rowid DESC LIMIT 1)",
+                (median_ratio,))
+            conn.commit()
+            messagebox.showinfo("Auto Calibrate", f"New cal_factor saved: {median_ratio:.2f}")
+
+        Button(add_frame, text="⊹", command=lambda: auto_calibrate_factor(2), **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
+               width=5, height=1, font=(FONT_NAME, 10, "bold")).grid(row=0, column=9, padx=6)
+
+        # =====Delete Record=====
         def delete_record():
             selected = tree.selection()
             if not selected:
@@ -327,9 +372,9 @@ def build_tab(app, tab):
             tree.delete(selected)
 
         Button(add_frame, text="🗑", command=delete_record, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=5, height=1, font=(FONT_NAME, 10, "bold")).grid(row=0, column=9, padx=6)
+               width=5, height=1, font=(FONT_NAME, 10, "bold")).grid(row=0, column=10, padx=6)
 
-        # Kits
+        # =====Kits=====
         Label(scroll_frame, text="Select Radiopharmaceutical Kit:", **TEXT_COLORS, font=(FONT_NAME, 14, "bold")).pack(pady=(40, 20))
         kits_frame = Frame(scroll_frame, bg=C4)
         kits_frame.pack(pady=2)
@@ -456,8 +501,8 @@ def build_tab(app, tab):
                     cur.execute("SELECT MAX(CAST(id AS INTEGER)) FROM kits WHERE parent_id IS NULL")
                     max_id = cur.fetchone()[0]
                     kit_id = str(int(max_id or 0) + 1)
-                    cur.execute("INSERT INTO kits (id, parent_id, date, time, kit, volume, activity, concentration, dose, dose_volume, volume_left, patient_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                                (kit_id, None, date_val, time_val, kit_val, volume_val, activity_val, concentration_val, None, None, volume_left_val, None))
+                    cur.execute("INSERT INTO kits (id, parent_id, date, time, kit, volume, activity, concentration, elution, dose, dose_volume, volume_left, patient_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                (kit_id, None, date_val, time_val, kit_val, volume_val, activity_val, concentration_val, selected_elution.get(), None, None, volume_left_val, None))
                     conn.commit()
                     tv_id = kit_tree.insert("", "end", iid=kit_id, values=(time_val, kit_val, f"{volume_val:.2f}", f"{activity_val:.2f}",
                                                                                         f"{concentration_val:.2f}", "", "", f"{volume_left_val:.2f}"))
@@ -486,7 +531,7 @@ def build_tab(app, tab):
             popup.configure(bg=C3)
             center_window(popup, width, height)
 
-        #Kit Buttons
+        # Kit Buttons
         kits = ["MDP", "CERETEC", "MAG-3", "CEA-SCAN", "DTPA", "LEUKOSCAN", "MAASCINT", "BIDA", "DMSA", "CARDIOLITE", "MYOVIEW", "NEOSPECT", "PHYTATE", "--", "HIG"]
         for idx, text in enumerate(kits):
             r = idx // 5
@@ -523,26 +568,20 @@ def build_tab(app, tab):
             popup = Toplevel(tab)
             popup.title("Insert Actual Values")
             popup.config(bg=C4, pady=15)
-            center_window(popup, 250, 160)
+            center_window(popup, 250, 120)
             values = list(kit_tree.item(parent_id, "values"))
             planned_activity = values[3].split("→")[0].strip()
-            planned_volume = values[2].split("→")[0].strip()
             Label(popup, text="Actual Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=5, pady=10)
             actual_activity_entry = Entry(popup, width=10)
             actual_activity_entry.insert(0, f"{planned_activity}")
             actual_activity_entry.grid(row=0, column=1, padx=5, pady=10)
-            Label(popup, text="Actual Volume (ml):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, padx=5, pady=10)
-            actual_volume_entry = Entry(popup, width=10)
-            actual_volume_entry.insert(0, f"{planned_volume}")
-            actual_volume_entry.grid(row=1, column=1, padx=5, pady=10)
 
             #Save Actual Values For Parent
             def save():
                 try:
                     actual_activity = float(actual_activity_entry.get())
-                    actual_volume = float(actual_volume_entry.get())
                 except ValueError:
-                    messagebox.showerror("Error", "Invalid values.")
+                    messagebox.showerror("Error", "Invalid value.")
                     return
                 cfg = KIT_CONFIG.get(values[1], {})
                 dilution_cfg = cfg.get("dilution", "0ml")
@@ -558,19 +597,31 @@ def build_tab(app, tab):
                     dilution_val = float(dilution_cfg)
                 else:
                     dilution_val = float(values[2].split("→")[0].strip())
+                cur.execute("SELECT date, time, elution FROM kits WHERE id=?", (parent_id,))
+                kit_date, kit_time, elution_time = cur.fetchone()
+                cur.execute("SELECT date, time, concentration FROM elutions WHERE date=? AND time=?", (kit_date, elution_time))
+                el_date, el_time, el_conc = cur.fetchone()
+                elution_dt = datetime.strptime(f"{el_date} {el_time}", "%d-%m-%Y %H:%M")
+                labeling_dt =  datetime.strptime(f"{kit_date} {kit_time}", "%d-%m-%Y %H:%M")
+                delta_mins = (labeling_dt - elution_dt).total_seconds() / 60
+                decay_factor = math.exp(-math.log(2) * delta_mins / (T12_TC99M * 60))
+                concentration_now = el_conc * decay_factor
+                actual_volume = round(actual_activity / concentration_now, 2)
                 volume_left_parent = max(actual_volume, dilution_val)
-                values[3] = f"{planned_activity} → {actual_activity:.2f}"
-                values[2] = f"{planned_volume} → {actual_volume:.2f}"
+                actual_conc = round(actual_activity / volume_left_parent, 2)
+                values[3] = f"{actual_activity:.2f}"
+                values[2] = f"{actual_volume:.2f}"
+                values[4] = f"{actual_conc:.2f}"
                 values[7] = f"{volume_left_parent:.2f}"
                 kit_tree.item(parent_id, values=values)
-                cur.execute("UPDATE kits SET activity=?, volume=?, volume_left=? WHERE id=?",
-                            (actual_activity, actual_volume, volume_left_parent, parent_id))
+                cur.execute("UPDATE kits SET activity=?, volume=?, concentration=?, volume_left=? WHERE id=?",
+                            (actual_activity, actual_volume, actual_conc, volume_left_parent, parent_id))
                 conn.commit()
                 children = kit_tree.get_children(parent_id)
                 running_vol_left = volume_left_parent
                 for child_id in children:
                     child_vals = list(kit_tree.item(child_id, "values"))
-                    dose_volume = float(child_vals[6].split("→")[-1].strip())
+                    dose_volume = float(child_vals[6].strip())
                     running_vol_left = round(running_vol_left - dose_volume, 2)
                     child_vals[7] = f"{running_vol_left:.2f}"
                     kit_tree.item(child_id, values=child_vals)
@@ -584,6 +635,7 @@ def build_tab(app, tab):
                     if str(row[0].value) == str(parent_id):
                         row[5].value = actual_volume
                         row[6].value = actual_activity
+                        row[7].value = actual_conc
                         row[10].value = volume_left_parent
                         break
                 running_vol_left = volume_left_parent
@@ -598,42 +650,59 @@ def build_tab(app, tab):
                 popup.destroy()
 
             Button(popup, text="OK", command=save, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                   width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=2, column=0, pady=10, padx=6)
+                   width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, pady=10, padx=6)
             Button(popup, text="Cancel", command=popup.destroy, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['bg', 'width', 'height', 'font']},
-                   bg=C4, width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=2, column=1, pady=10, padx=6)
+                   bg=C4, width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=1, column=1, pady=10, padx=6)
 
         # ACTUAL VALUES FOR CHILD
         def open_actual_child_popup(child_id):
             popup = Toplevel(tab)
             popup.title("Insert Actual Values")
             popup.config(bg=C4, pady=15)
-            center_window(popup, 250, 160)
+            center_window(popup, 250, 120)
             values = list(kit_tree.item(child_id, "values"))
             planned_dose = values[5].split("→")[0].strip()
-            planned_dose_vol = values[6].split("→")[0].strip()
-            Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0,
-                                                                                                      padx=5, pady=10)
+            Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=5, pady=10)
             actual_dose_entry = Entry(popup, width=10)
             actual_dose_entry.insert(0, f"{planned_dose}")
             actual_dose_entry.grid(row=0, column=1, padx=5, pady=10)
-            Label(popup, text="Actual Volume (ml):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, padx=5, pady=10)
-            actual_dose_vol_entry = Entry(popup, width=10)
-            actual_dose_vol_entry.insert(0, f"{planned_dose_vol}")
-            actual_dose_vol_entry.grid(row=1, column=1, padx=5, pady=10)
 
             #Save Actual Values for Child
             def save():
                 try:
                     actual_dose = float(actual_dose_entry.get())
-                    actual_dose_vol = float(actual_dose_vol_entry.get())
                 except ValueError:
                     messagebox.showerror("Error", "Invalid values.")
                     return
                 parent_id = kit_tree.parent(child_id)
                 siblings = list(kit_tree.get_children(parent_id))
                 child_index = siblings.index(child_id)
-                values[5] = f"{planned_dose} → {actual_dose:.2f}"
-                values[6] = f"{planned_dose_vol} → {actual_dose_vol:.2f}"
+                child_vals_now = list(kit_tree.item(child_id, "values"))
+                child_time_str = str(child_vals_now[0]).strip()
+                cur.execute("SELECT date, time, concentration, elution FROM kits WHERE id=?", (parent_id,))
+                parent_row = cur.fetchone()
+                if not parent_row:
+                    messagebox.showerror("Error", "Parent kit has no valid time/concentration.")
+                    return
+                kit_date, parent_time, parent_conc, elution_time  = parent_row
+                if not elution_time:
+                    messagebox.showerror("Error", "No elution_time stored for this kit.")
+                    return
+                try:
+                    parent_dt = datetime.strptime(f"{kit_date} {parent_time}", f"{DATE_FORMAT} {HOUR_FORMAT}")
+                    child_dt = datetime.strptime(f"{kit_date} {child_time_str}", f"{DATE_FORMAT} {HOUR_FORMAT}")
+                except ValueError:
+                    messagebox.showerror("Error", "Invalid Time Format (Has to be HH:MM).")
+                    return
+                delta_mins = (child_dt - parent_dt).total_seconds() / 60
+                if delta_mins < 0:
+                    messagebox.showerror("Error", "Patient dosing time is before parent vial time.")
+                    return
+                decay_factor = math.exp(-math.log(2) * delta_mins / (T12_TC99M * 60))
+                concentration_now = float(parent_conc) * decay_factor
+                actual_dose_vol = round(actual_dose / concentration_now, 2)
+                child_vals_now[5] = f"{actual_dose:.2f}"
+                child_vals_now[6] = f"{actual_dose_vol:.2f}"
                 if child_index == 0:
                     parent_vals = kit_tree.item(parent_id, "values")
                     running_vol_left = float(parent_vals[7])
@@ -641,13 +710,13 @@ def build_tab(app, tab):
                     prev_vals = kit_tree.item(siblings[child_index - 1], "values")
                     running_vol_left = float(prev_vals[7])
                 running_vol_left = round(running_vol_left - actual_dose_vol, 2)
-                values[7] = f"{running_vol_left:.2f}"
-                kit_tree.item(child_id, values=values)
+                child_vals_now[7] = f"{running_vol_left:.2f}"
+                kit_tree.item(child_id, values=child_vals_now)
                 cur.execute("UPDATE kits SET dose=?, dose_volume=?, volume_left=? WHERE id=?",
                             (actual_dose, actual_dose_vol, running_vol_left, child_id))
                 for next_child in siblings[child_index + 1:]:
                     next_vals = list(kit_tree.item(next_child, "values"))
-                    dv = float(next_vals[6].split("→")[-1].strip())
+                    dv = float(next_vals[6].strip())
                     running_vol_left = round(running_vol_left - dv, 2)
                     next_vals[7] = f"{running_vol_left:.2f}"
                     kit_tree.item(next_child, values=next_vals)
@@ -669,9 +738,9 @@ def build_tab(app, tab):
                 popup.destroy()
 
             Button(popup, text="Save", command=save, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ["width", "height", "font"]},
-                   width=10, height=1).grid(row=2, column=0, padx=10, pady=10)
+                   width=10, height=1).grid(row=1, column=0, padx=10, pady=10)
             Button(popup, text="Cancel", command=popup.destroy, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ["width", "height", "font"]},
-                   width=10, height=1).grid(row=2, column=1, padx=10, pady=10)
+                   width=10, height=1).grid(row=1, column=1, padx=10, pady=10)
 
         # DOUBLE CLICK FOR PATIENT OR ACTUAL VALUES (PARENT)
         def on_tree_double_click(event):
@@ -689,6 +758,11 @@ def build_tab(app, tab):
             else:
                 if col_index in (5, 6):
                     open_actual_child_popup(row_id)
+            parent = kit_tree.parent(row_id)
+            if parent:
+                kit_tree.item(parent, open=True)
+            else:
+                kit_tree.item(row_id, open=True)
 
         kit_tree.bind("<Double-1>", on_tree_double_click)
 
@@ -728,16 +802,25 @@ def build_tab(app, tab):
             popup = Toplevel()
             popup.title("Patient Data")
             popup.configure(bg=C4)
-            center_window(popup, 240, 130)
+            center_window(popup, 240, 160)
             frame = Frame(popup, bg=C4)
             frame.pack(expand=True, fill="both", anchor="center", padx=10, pady=10)
             Label(frame, text="Patient Name: ", font=(FONT_NAME, 10), **TEXT_COLORS).grid(row=0, column=0, pady=5)
             name_entry = Entry(frame, width=18)
             name_entry.insert(0, "-")
             name_entry.grid(row=0, column=1, pady=5)
-            Label(frame, text="Dose(mCi):", font=(FONT_NAME, 10), **TEXT_COLORS).grid(row=1, column=0, pady=5)
+            Label(frame, text="Time: ", font=(FONT_NAME, 10), **TEXT_COLORS).grid(row=1, column=0, pady=5)
+            time_frame = Frame(frame, bg="white", highlightbackground="black", highlightthickness=0)
+            time_frame.grid(row=1, column=1, padx=5)
+            time_entry = Entry(time_frame, width=6, bd=0, font=(FONT_NAME, 10))
+            time_entry.pack(side="left", padx=(3,0), pady=2)
+            update_time(time_entry)
+            refresh_time_but =  Button(time_frame, text="↻", command=lambda nt=time_entry: update_time(nt), bg="white",
+                                       fg="black", bd=0, padx=3, pady=0, font=(FONT_NAME,10), cursor="hand2")
+            refresh_time_but.pack(side="right", padx=3)
+            Label(frame, text="Dose(mCi):", font=(FONT_NAME, 10), **TEXT_COLORS).grid(row=2, column=0, pady=5)
             dose_entry = Entry(frame, width=10)
-            dose_entry.grid(row=1, column=1, pady=5)
+            dose_entry.grid(row=2, column=1, pady=5)
 
             #Save New Patient Data
             def save_patient():
@@ -750,35 +833,50 @@ def build_tab(app, tab):
                 parent_id = kit_row_id
                 parent_vals = kit_tree.item(parent_id, "values")
                 kit_val = parent_vals[1]
-                parent_time = parent_vals[0]
+                parent_time = str(parent_vals[0]).strip()
                 initial_activity = float(parent_vals[3])
-                initial_conc = float(parent_vals[4])
                 initial_volume = float(parent_vals[7])
                 date_val = datetime.now().strftime("%d-%m-%Y")
                 parent_datetime = datetime.strptime(f"{date_val} {parent_time}", "%d-%m-%Y %H:%M")
-                now_dt = datetime.now()
-                delta_h = (now_dt - parent_datetime).total_seconds() / 3600
+                selected_time_str = time_entry.get().strip()
+                try:
+                    selected_dt = datetime.strptime(f"{date_val} {selected_time_str}", "%d-%m-%Y %H:%M")
+                except ValueError:
+                    messagebox.showerror("Error", "Please enter a valid Time (HH:MM).")
+                    return
+                delta_h = (selected_dt - parent_datetime).total_seconds() / 3600
+                if delta_h < 0:
+                    messagebox.showerror("Error", "Patient dosing time is before kit time.")
+                    return
                 decay_factor = math.exp(-math.log(2) * delta_h / T12_TC99M)
-                activity_now = round(initial_activity * decay_factor, 2)
+                initial_conc = initial_activity / initial_volume
+                current_conc = round(initial_conc * decay_factor, 2)
+                if current_conc <= 0:
+                    messagebox.showerror("Error", "Calculated concentration is invalid.")
+                    return
                 children = list(kit_tree.get_children(parent_id))
-                given_activity = 0.0
-                for child in children:
-                    vals = kit_tree.item(child, "values")
-                    if vals[5]:
-                        given_activity += float(vals[5])
-                activity_left = round(activity_now - given_activity, 2)
-                if activity_left <= 0:
-                    messagebox.showerror("Error", "No activity left in vial.")
+                if children:
+                    try:
+                        current_volume_left = float(kit_tree.item(children[-1], "values")[7])
+                    except (ValueError, IndexError):
+                        messagebox.showerror("Error", "Invalid previous volume left value.")
+                        return
+                else:
+                    current_volume_left = initial_volume
+                if current_volume_left <= 0:
+                    messagebox.showerror("Error", "No volume left in vial.")
                     return
-                if dose > activity_left:
-                    messagebox.showerror("Error", f"Not enough activity left.\nAvailable: {activity_left:.2f} mCi")
-                    return
-                current_volume_left = (float(kit_tree.item(children[-1], "values")[-1]) if children else initial_volume)
-                current_conc = round(activity_left / current_volume_left, 2)
                 dose_volume = round(dose / current_conc, 2)
                 new_volume_left = round(current_volume_left - dose_volume, 2)
+                if dose_volume <= 0:
+                    messagebox.showerror("Error", "Calculated dose volume is invalid.")
+                    return
                 if new_volume_left < 0:
-                    messagebox.showerror("Error", "Not enough volume left.")
+                    messagebox.showerror("Error", f"Not enough volume left.\nAvailable volume: {current_volume_left:.2f} ml.")
+                    return
+                activity_available_now = round(current_volume_left * current_conc, 2)
+                if dose > activity_available_now:
+                    messagebox.showerror("Error", f"Not enough activity left.\nAvailable {activity_available_now:.2f} mCi.")
                     return
                 max_seq = 0
                 for child in children:
@@ -790,12 +888,11 @@ def build_tab(app, tab):
                         continue
                 sequence = max_seq + 1
                 patient_id = f"{parent_id}.{sequence}"
-                now_time = datetime.now().strftime("%H:%M")
                 cur = conn.cursor()
                 cur.execute("INSERT INTO kits (id, parent_id, date, time, kit, volume, activity, concentration, dose, dose_volume, volume_left, patient_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                            (patient_id, parent_id, date_val, now_time, kit_val, None, None, current_conc, dose, dose_volume, new_volume_left, name))
+                            (patient_id, parent_id, date_val, selected_time_str, kit_val, None, None, current_conc, dose, dose_volume, new_volume_left, name))
                 conn.commit()
-                kit_tree.insert(parent_id, "end", iid=patient_id, values=(now_time, "", "", "", f"{current_conc:.2f}", f"{dose:.2f}",
+                kit_tree.insert(parent_id, "end", iid=patient_id, values=(selected_time_str, "", "", "", f"{current_conc:.2f}", f"{dose:.2f}",
                                                                                 f"{dose_volume:.2f}", f"{new_volume_left:.2f}"))
                 kit_tree.item(parent_id, open=True)
                 folder = os.path.dirname(dbfile)
@@ -804,16 +901,16 @@ def build_tab(app, tab):
                 ws = wb["Kits"]
                 insert_row = find_patient_insert_row(ws, parent_id)
                 ws.insert_rows(insert_row)
-                row_values = [patient_id, parent_id, "", now_time, "", "", "", f"{current_conc:.2f}", f"{dose:.2f}", f"{dose_volume:.2f}", f"{new_volume_left:.2f}", name]
+                row_values = [patient_id, parent_id, "", selected_time_str, "", "", "", f"{current_conc:.2f}", f"{dose:.2f}", f"{dose_volume:.2f}", f"{new_volume_left:.2f}", name]
                 for col, value in enumerate(row_values, start=1):
                     ws.cell(row=insert_row, column=col, value=value)
                 wb.save(excel_path)
                 popup.destroy()
 
             Button(frame, text="Save", command=save_patient, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                   width=12, height=1).grid(row=2, column=0, pady=10, padx=5)
+                   width=12, height=1).grid(row=4, column=0, pady=10, padx=5)
             Button(frame, text="Cancel", command=popup.destroy, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                   width=12, height=1).grid(row=2, column=1, pady=10, padx=5)
+                   width=12, height=1).grid(row=4, column=1, pady=10, padx=5)
 
         #Delete Parent(Kit) or Child(Patient)
         def delete_selected_kit_or_patient():
