@@ -107,7 +107,7 @@ def build_tab(app, tab):
                 """CREATE TABLE IF NOT EXISTS elutions(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, time TEXT, activity REAL)""")
             cur.execute(
                 """CREATE TABLE IF NOT EXISTS dotatoc (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, patient TEXT, weight REAL, admin_time TEXT, dose REAL,
-                                                       volume REAL, concentration REAL, itlc REAL)""")
+                                                       volume REAL, concentration REAL, itlc REAL, residual REAL)""")
             cur.execute("INSERT INTO generator_info VALUES (?,?,?,?,?,?,?,?)",
                         (gen_id, gen_model, start_date_entry.get(), cal_date, cal_time, activity, expiration_date_entry.get(), None))
             conn.commit()
@@ -185,11 +185,9 @@ def build_tab(app, tab):
         Label(info_frame, text=f"T1/2 Ga68 (MIN): {T12_GA68}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=1, column=1, padx=6, pady=6)
         Label(info_frame, text=f"Expiration Date: {expiration_date}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=2, column=1, padx=6, pady=6)
         dispose_button = Button(info_frame, text="✗Dispose Gen✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                                width=14, height=1, font=(FONT_NAME, 10, "bold"), command=lambda: dispose_gen(conn=conn, dbfile=dbfile, on_disposed_callback=update_header_and_disable
-                                                                (header=header, tab=tab)))
+                                width=14, height=1, font=(FONT_NAME, 10, "bold"), command=lambda: dispose_gen(conn=conn, dbfile=dbfile, on_disposed_callback=lambda: update_header_and_disable(
+                                cur=conn.cursor(), header=header, tab=tab, is_disposed=True)))
         dispose_button.grid(row=3, column=1, padx=6, pady=6)
-        if is_disposed or is_expired:
-            update_header_and_disable(header=header, tab=tab, is_disposed=is_disposed, is_expired=is_expired)
         # Table
         columns = [("date", "Date", 120), ("time", "Time", 100), ("activity", "Activity(mCi)", 120)]
         tree = ttk.Treeview(scroll_frame, columns=[c[0] for c in columns], show="headings")
@@ -344,11 +342,11 @@ def build_tab(app, tab):
         select_date.grid(column=1, row=0, padx=5)
         Button(date_frame, text="Load", command=lambda: load_dotatoc_by_date(select_date.get()), **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=6, height=1).grid(column=2, row=0, padx=10)
         Button(date_frame, text="🗑", command=lambda: delete_dotatoc_row(), **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=5, height=1, font=(FONT_NAME, 10, "bold")).grid(row=0, column=3, padx=5)
-        dotatoc_tree = ttk.Treeview(scroll_frame, columns=("Date", "Weight (kg)", "Admin Time", "Dose (mCi)", "Vol (ml)", "Conc (mCi/ml)", "ITLC(<2%)"), show="headings")
+        dotatoc_tree = ttk.Treeview(scroll_frame, columns=("Date", "Weight (kg)", "Admin Time", "Dose (mCi)", "Vol (ml)", "Conc (mCi/ml)", "ITLC(<2%)", "Residual(mCi)"), show="headings")
         dotatoc_tree.pack(pady=10)
-        for col in ("Date", "Weight (kg)", "Admin Time", "Dose (mCi)", "Vol (ml)", "Conc (mCi/ml)", "ITLC(<2%)"):
+        for col in ("Date", "Weight (kg)", "Admin Time", "Dose (mCi)", "Vol (ml)", "Conc (mCi/ml)", "ITLC(<2%)", "Residual(mCi)"):
             dotatoc_tree.heading(col, text=col.capitalize())
-            dotatoc_tree.column(col, width=110, anchor="center")
+            dotatoc_tree.column(col, width=100, anchor="center")
         tree_style = ttk.Style()
         tree_style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", rowheight=26)
         tree_style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME ,11 ,"bold"))
@@ -357,11 +355,11 @@ def build_tab(app, tab):
         def load_dotatoc_by_date(selected_date):
             for item in dotatoc_tree.get_children():
                 dotatoc_tree.delete(item)
-            rows = cur.execute("SELECT id, date, patient, weight, admin_time, dose, volume, concentration, itlc FROM dotatoc WHERE date=? ORDER BY admin_time", (selected_date,)).fetchall()
+            rows = cur.execute("SELECT id, date, patient, weight, admin_time, dose, volume, concentration, itlc, residual FROM dotatoc WHERE date=? ORDER BY admin_time", (selected_date,)).fetchall()
             for r in rows:
-                row_id , date_val, patient, weight, admin_time, dose, volume, concentration, itlc = r
+                row_id , date_val, patient, weight, admin_time, dose, volume, concentration, itlc, residual = r
                 dotatoc_tree.insert("", "end", iid=str(row_id), values=(date_val, float(weight), admin_time, float(dose), float(volume), float(concentration),
-                                                                                    f"{float(itlc):.2f}" if itlc not in (None, "") else ""), tags=(str(patient),))
+                                                                                    f"{float(itlc):.2f}" if itlc not in (None, "") else "", f"{float(residual):.2f}" if residual not in (None, "") else ""), tags=(str(patient),))
         # Calculate & Add Row
         def dotatoc_calc():
             try:
@@ -400,12 +398,12 @@ def build_tab(app, tab):
                     messagebox.showerror("Error", "Calculated concentration is not valid.")
                     return
                 vol = round(dose / conc_admin, 1)
-                cur.execute("INSERT INTO dotatoc (date, patient, weight, admin_time, dose, volume, concentration, itlc) VALUES (?,?,?,?,?,?,?,?)",
-                            (date_str, patient, weight, admin_time_str, float(dose), float(vol), float(conc_admin), None))
+                cur.execute("INSERT INTO dotatoc (date, patient, weight, admin_time, dose, volume, concentration, itlc, residual) VALUES (?,?,?,?,?,?,?,?,?)",
+                            (date_str, patient, weight, admin_time_str, float(dose), float(vol), float(conc_admin), None, None))
                 conn.commit()
                 row_id = cur.lastrowid
-                append_row_to_sheet(excel_path=get_dotatoc_excel_path(dbfile), sheet_name="DOTATOC", row_values=(row_id, date_str, patient, weight, admin_time_str, f"{dose:.1f}", f"{vol:.1f}", f"{conc_admin:.2f}", ""))
-                dotatoc_tree.insert("", "end", iid=str(row_id), values=(date_str, weight, admin_time_str, f"{dose:.1f}", f"{vol:.1f}", f"{conc_admin:.2f}", ""), tags=(patient,))
+                append_row_to_sheet(excel_path=get_dotatoc_excel_path(dbfile), sheet_name="DOTATOC", row_values=(row_id, date_str, patient, weight, admin_time_str, f"{dose:.1f}", f"{vol:.1f}", f"{conc_admin:.2f}", "", ""))
+                dotatoc_tree.insert("", "end", iid=str(row_id), values=(date_str, weight, admin_time_str, f"{dose:.1f}", f"{vol:.1f}", f"{conc_admin:.2f}", "", ""), tags=(patient,))
                 patient_entry.delete(0, END)
                 patient_entry.insert(0, "-")
                 weight_entry.delete(0, END)
@@ -448,6 +446,7 @@ def build_tab(app, tab):
             old_dose = values[3]
             concentration = values[5]
             old_itlc = values[6]
+            old_residual = values[7]
             popup = Toplevel()
             popup.title("Update Real Dose")
             popup.geometry("260x150")
@@ -478,15 +477,16 @@ def build_tab(app, tab):
                                      new_dose=real_dose,
                                      new_volume=new_volume,
                                      new_concentration=conc_val,
-                                     new_itlc=old_itlc)
-                dotatoc_tree.item(row_id, values=(date_val, weight, admin_time, f"{real_dose:.2f}", f"{new_volume:.1f}", f"{conc_val:.2f}", old_itlc))
+                                     new_itlc=old_itlc,
+                                     new_residual=old_residual)
+                dotatoc_tree.item(row_id, values=(date_val, weight, admin_time, f"{real_dose:.2f}", f"{new_volume:.1f}", f"{conc_val:.2f}", old_itlc, old_residual))
                 popup.destroy()
             Button(frame, text="Save", command=save_real_dose, **{k: v for k, v in BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                     width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=10, pady=10)
             Button(frame, text="Cancel", command=popup.destroy, **{k: v for k, v in BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                     width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=1, padx=10, pady=10)
 
-        #ITLC Popup
+        #ITLC/Residual Popup
         def open_itlc_popup(row_id):
             values = dotatoc_tree.item(row_id, "values")
             date_val = values[0]
@@ -496,6 +496,7 @@ def build_tab(app, tab):
             volume = values[4]
             concentration = values[5]
             old_itlc = values[6]
+            old_residual = values[7]
             popup = Toplevel()
             popup.title("Update ITLC")
             popup.geometry("240x150")
@@ -521,10 +522,50 @@ def build_tab(app, tab):
                                      new_dose=float(dose),
                                      new_volume=float(volume),
                                      new_concentration=float(concentration),
-                                     new_itlc=new_itlc)
-                dotatoc_tree.item(row_id, values=(date_val, weight, admin_time, dose, volume, concentration, f"{new_itlc:.2f}"))
+                                     new_itlc=new_itlc,
+                                     new_residual=old_residual)
+                dotatoc_tree.item(row_id, values=(date_val, weight, admin_time, dose, volume, concentration, f"{new_itlc:.2f}", old_residual))
                 popup.destroy()
             Button(frame, text="Save", command=save_itlc, **{k: v for k, v in BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
+                    width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=10, pady=10)
+            Button(frame, text="Cancel", command=popup.destroy, **{k: v for k, v in BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
+                    width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=1, padx=10, pady=10)
+
+        def open_residual_popup(row_id):
+            values = dotatoc_tree.item(row_id, "values")
+            date_val = values[0]
+            weight = values[1]
+            admin_time = values[2]
+            dose = values[3]
+            volume = values[4]
+            concentration = values[5]
+            old_itlc = values[6]
+            old_residual = values[7]
+            popup = Toplevel()
+            popup.title("Update Residual")
+            popup.geometry("240x150")
+            popup.configure(bg=BG)
+            center_window(popup, 240, 150)
+            frame = Frame(popup, bg=BG)
+            frame.pack(expand=True, fill="both", padx=10, pady=10)
+            Label(frame, text="Residual:", bg=BG, fg="white", font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=5, pady=10)
+            residual_entry = Entry(frame, width=10)
+            if old_residual not in ("", None):
+                residual_entry.insert(0, str(old_residual))
+            residual_entry.grid(row=0, column=1, padx=5, pady=10)
+            def save_residual():
+                try:
+                    new_residual = float(residual_entry.get().strip())
+                except ValueError:
+                    messagebox.showerror("Error", "Invalid Residual value.")
+                    return
+                cur.execute("UPDATE dotatoc SET residual=? WHERE id=?", (new_residual, row_id))
+                conn.commit()
+                update_dotatoc_excel(dbfile=dbfile, row_id=row_id, new_dose=float(dose), new_volume=float(volume), new_concentration=float(concentration),
+                                     new_itlc=float(old_itlc) if old_itlc not in ("", None) else None, new_residual=new_residual)
+                dotatoc_tree.item(row_id, values=(date_val, weight, admin_time, dose, volume, concentration, old_itlc, f"{new_residual:.2f}"))
+                popup.destroy()
+            Button(frame, text="Save", command=save_residual, **{k: v for k, v in BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                     width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=10, pady=10)
             Button(frame, text="Cancel", command=popup.destroy, **{k: v for k, v in BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                     width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=1, padx=10, pady=10)
@@ -537,6 +578,8 @@ def build_tab(app, tab):
                 return
             if col_id == "#7":
                 open_itlc_popup(row_id)
+            elif col_id == "#8":
+                open_residual_popup(row_id)
             else:
                 open_real_dose_popup(row_id)
 
@@ -546,6 +589,10 @@ def build_tab(app, tab):
         btn_frame = Frame(tab, bg=C4)
         btn_frame.pack(pady=10)
         Button(btn_frame, text="Back", **TAB_BUTTON_STYLE, command=lambda nt=tab: app.back_to_main(nt)).pack()
+
+        #---
+        if is_disposed or is_expired:
+            update_header_and_disable(cur=conn.cursor(), header=header, tab=tab, is_disposed=is_disposed, is_expired=is_expired)
 
     # RUN
     select_file()

@@ -79,14 +79,14 @@ def create_excel_for_ga68(excel_path):
         ws2 = wb.create_sheet("Elutions")
         ws2.append(["", "Date", "Time", "Activity(mCi)"])
         ws3 = wb.create_sheet("DOTATOC")
-        ws3.append(["", "Date", "Patient", "Weight (kg)", "Admin Time", "Dose (mCi)", "Volume (ml)", "Concentration (mCi/ml)", "ITLC(<2%)"])
+        ws3.append(["", "Date", "Patient", "Weight (kg)", "Admin Time", "Dose (mCi)", "Volume (ml)", "Concentration (mCi/ml)", "ITLC(<2%)", "Residual(mCi)"])
         wb.save(excel_path)
 
 #Excel Helpers for Ga68
 def get_dotatoc_excel_path(dbfile):
     folder = os.path.dirname(dbfile)
     return os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
-def update_dotatoc_excel(dbfile, row_id, new_dose, new_volume, new_concentration, new_itlc):
+def update_dotatoc_excel(dbfile, row_id, new_dose, new_volume, new_concentration, new_itlc, new_residual):
     excel_path = get_dotatoc_excel_path(dbfile)
     wb = load_workbook(excel_path)
     ws = wb["DOTATOC"]
@@ -96,6 +96,7 @@ def update_dotatoc_excel(dbfile, row_id, new_dose, new_volume, new_concentration
             ws.cell(row=r, column=7, value=new_volume)
             ws.cell(row=r, column=8, value=new_concentration)
             ws.cell(row=r, column=9, value=new_itlc)
+            ws.cell(row=r, column=10, value=new_residual)
             break
     wb.save(excel_path)
 
@@ -244,15 +245,19 @@ def disable_buttons(parent, exempt_texts=None):
 
 #Update Headers and Disable Buttons after Stored or Expired
 def update_header_and_disable(cur, header, tab, is_stored=False, is_disposed=False, is_expired=False):
-    cur.execute("SELECT stored_date, disposal_date FROM generator_info ORDER BY rowid DESC LIMIT 1")
-    stored_date, disposal_date = cur.fetchone()
-    if is_disposed:
+    if is_disposed and not is_stored and not is_expired:
+        cur.execute("SELECT disposal_date FROM generator_info ORDER BY rowid DESC LIMIT 1")
+        row = cur.fetchone()
+        disposal_date = row[0] if row and row[0] else ""
         header.config(text=f"⚠ GENERATOR DISPOSED ({disposal_date}) – NO FURTHER ACTIONS ALLOWED", fg="#660000", highlightthickness=1)
         disable_buttons(tab, exempt_texts=["Back", "Load"])
-    elif is_stored:
+    elif is_stored and not is_disposed and not is_expired:
+        cur.execute("SELECT stored_date FROM generator_info ORDER BY rowid DESC LIMIT 1")
+        row = cur.fetchone()
+        stored_date = row[0] if row and row[0] else ""
         header.config(text=f"⚠ GENERATOR STORED ({stored_date}) – NO FURTHER ACTIONS ALLOWED", fg="#CC0000", highlightthickness=1)
         disable_buttons(tab, exempt_texts=["Back", "Load", "✗Dispose Gen✗"])
-    elif is_expired:
+    elif is_expired and not is_disposed and not is_stored:
         header.config(text="⚠ GENERATOR EXPIRED – NO FURTHER ACTIONS ALLOWED", fg="#FF8000", highlightthickness=1)
         disable_buttons(tab, exempt_texts=["Back", "Load", "✗Store Gen✗"])
 
@@ -421,7 +426,7 @@ def log_vials_disposal(vials_full_rows):
         cur.execute("INSERT INTO disposed_vials (disposal_date, disposal_time, radionuclide, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_mci, limit_bq) "
                     "VALUES (?,?,?,?,?,?,?,?,?,?)", (disp_date, disp_time, radionuclide, calibration_date, stored_at, float(activity_mci), permitted_date, recommended_date,
                                                       "" if limit_mci is None else float(limit_mci), "" if limit_bq is None else float(limit_bq)))
-        mark_vial_as_disposed(source_db=source_db, calibration_date=calibration_date, activity=activity_mci,  disposed_date=disp_date)
+        mark_vial_as_disposed(source_db=source_db, disposed_date=disp_date)
     wb.save(xlsx_path)
     conn.commit()
     conn.close()
@@ -482,29 +487,18 @@ def log_tc99m_batch_disposal(batch_path: str, finalized_at: str, items_rows, lim
     wb.save(xlsx_path)
 
 #=====MARK VIAL AS DISPOSED=====
-def mark_vial_as_disposed(source_db, calibration_date, activity, disposed_date):
+def mark_vial_as_disposed(source_db, disposed_date):
     conn = sqlite3.connect(source_db)
     cur = conn.cursor()
-    cur.execute("UPDATE vial_info SET disposal_date=? WHERE cal_date=? AND activity=?", (disposed_date, calibration_date, float(activity)))
+    cur.execute("UPDATE vial_info SET disposal_date=?", (disposed_date,))
     conn.commit()
     conn.close()
     source_excel = os.path.splitext(source_db)[0] + ".xlsx"
     if os.path.exists(source_excel):
         wb = load_workbook(source_excel)
         ws = wb["Vial Info"]
-        for row in range(2, ws.max_row + 1):
-            cal_date_cell = ws.cell(row=row, column=1).value
-            activity_cell = ws.cell(row=row, column=3).value
-            try:
-                same_activity = float(activity_cell) == float(activity)
-            except:
-                same_activity = False
-            if (
-                str(cal_date_cell) == str(calibration_date)
-                and same_activity
-            ):
-                ws.cell(row=row, column=8, value=disposed_date)
-                break
+        if ws.max_row >= 2:
+            ws.cell(row=2, column=8, value=disposed_date)
         wb.save(source_excel)
 
 #=====VIALS SQLITE + (LIVE) EXCEL=====

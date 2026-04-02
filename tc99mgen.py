@@ -207,7 +207,6 @@ def build_tab(app, tab):
                                     command=lambda: dispose_gen(conn=conn, dbfile=dbfile, on_disposed_callback=lambda: (update_header_and_disable(cur=cur, header=header, tab=tab, is_disposed=True), configure_action_button())))
                 return
             action_button.config(state="disabled")
-        configure_action_button()
         # Elutions Table
         columns = [("date", "Date", 120), ("time", "Time", 100), ("activity", "Activity(mCi)", 120),
                    ("expected_activity", "Expected(mCi)", 120),
@@ -994,10 +993,14 @@ def build_tab(app, tab):
         Button(date_frame, text="🗑", command=delete_selected_kit_or_patient,
                **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                width=5, height=1, font=(FONT_NAME, 10, "bold")).grid(row=0, column=3, padx=5)
+
         # Main Buttons
         btn_frame = Frame(tab, bg=C4)
         btn_frame.pack(pady=10)
         Button(btn_frame, text="Back", **TAB_BUTTON_STYLE, command=lambda nt=tab: app.back_to_main(nt)).pack()
+
+        #---
+        configure_action_button()
 
     # RUN
     select_file()

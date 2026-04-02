@@ -504,6 +504,7 @@ def build_tab(app, tab, vial_name):
         elif disposal_date:
             Label(tab, text=f"⚠ VIAL DISPOSED ({disposal_date})-NO FURTHER ACTIONS ALLOWED", fg="#660000", bg=C4, borderwidth=1,
                   font=(FONT_NAME, 14, "bold"), justify="center").pack(pady=(5, 0))
+            disable_buttons(tab, exempt_texts=["Back"])
 
         # =====Main Buttons=====
         btn_frame = Frame(tab, bg=C4)
