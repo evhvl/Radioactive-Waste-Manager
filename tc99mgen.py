@@ -162,6 +162,7 @@ def build_tab(app, tab):
 
     # =====Load Selected Generator=====
     def load_generator(dbfile):
+        sync_tc99m_gen_for_disposal(dbfile)
         for widget in tab.winfo_children():
             widget.destroy()
         conn = sqlite3.connect(dbfile)
@@ -394,7 +395,7 @@ def build_tab(app, tab):
                 time_str = el[1]
                 elution_options.append(time_str)
                 elution_map[time_str] = el
-            if elutions is None:
+            if not elution_options:
                 messagebox.showerror("Error", "No elution found for this date.")
                 return
             popup = Toplevel()
@@ -647,9 +648,9 @@ def build_tab(app, tab):
                 popup.destroy()
 
             Button(popup, text="OK", command=save, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                   width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, pady=10, padx=6)
+                   width=8, height=2, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, pady=10, padx=6)
             Button(popup, text="Cancel", command=popup.destroy, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['bg', 'width', 'height', 'font']},
-                   bg=C4, width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=1, column=1, pady=10, padx=6)
+                   bg=C4, width=8, height=2, font=(FONT_NAME, 12, "bold")).grid(row=1, column=1, pady=10, padx=6)
 
         # ACTUAL VALUES FOR CHILD
         def open_actual_child_popup(child_id):
@@ -735,9 +736,9 @@ def build_tab(app, tab):
                 popup.destroy()
 
             Button(popup, text="Save", command=save, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ["width", "height", "font"]},
-                   width=10, height=1).grid(row=1, column=0, padx=10, pady=10)
+                   width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=10, pady=10)
             Button(popup, text="Cancel", command=popup.destroy, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ["width", "height", "font"]},
-                   width=10, height=1).grid(row=1, column=1, padx=10, pady=10)
+                   width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=1, padx=10, pady=10)
 
         # DOUBLE CLICK FOR PATIENT OR ACTUAL VALUES (PARENT)
         def on_tree_double_click(event):
@@ -799,7 +800,7 @@ def build_tab(app, tab):
             popup = Toplevel()
             popup.title("Patient Data")
             popup.configure(bg=C4)
-            center_window(popup, 270, 180)
+            center_window(popup, 290, 190)
             frame = Frame(popup, bg=C4)
             frame.pack(expand=True, fill="both", anchor="center", padx=10, pady=10)
             Label(frame, text="Patient Name: ", font=(FONT_NAME, 14), **TEXT_COLORS).grid(row=0, column=0, pady=5)

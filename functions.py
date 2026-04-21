@@ -281,7 +281,10 @@ def activity_now(radionuclide, stored_at_str, activity0):
     delta_h = (now_dt - stored_dt).total_seconds() / 3600.0
     if delta_h < 0:
         delta_h = 0.0
-    half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
+    if radionuclide == TC99M_NUCLIDE:
+        half_life = T12_TC99M
+    else:
+        half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
     return float(decay_activity(float(activity0), float(half_life), float(delta_h)))
 
 def calc_date_below_limit(activity_mci, half_life_hours, limit_bq, start_date):
@@ -305,7 +308,10 @@ def calc_date_below_limit(activity_mci, half_life_hours, limit_bq, start_date):
 
 def calc_recommended_and_permitted_date(radionuclide, activity_mci, stored_at, safety_factor=0.1):
     start_date = datetime.strptime(stored_at, DATE_FORMAT)
-    half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
+    if radionuclide == TC99M_NUCLIDE:
+        half_life = T12_TC99M
+    else:
+        half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
     limit_bq = DISPOSAL_LIMITS_BQ[radionuclide]
     if limit_bq in (None, 0):
         recommended = (start_date + timedelta(days=60)).strftime(DATE_FORMAT)
@@ -336,7 +342,10 @@ def disposal_summary(rows):
         radionuclide = r[1]
         stored_at_str = r[3]
         activity0 = float(r[4])
-        half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
+        if radionuclide == TC99M_NUCLIDE:
+            half_life = T12_TC99M
+        else:
+            half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
         stored_dt = datetime.strptime(stored_at_str, DATE_FORMAT)
         delta_hours = (now_dt - stored_dt).total_seconds() / 3600
         if delta_hours < 0:
@@ -445,7 +454,7 @@ def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_r
     ws.cell(row=start_row + 1, column=1, value=f"(radionuclide={TC99M_NUCLIDE}, limit(mCi)={limit_mci})")
     ws.cell(row=start_row + 1, column=1).alignment = Alignment(horizontal="left")
     ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 1, end_column=9)
-    headers = ["ID", "Stored At", "Activity(mCi)", "Permitted Date", "Recommended Date"]
+    headers = ["ID", "Item Label", "Stored At", "Activity(mCi)", "Permitted Date", "Recommended Date"]
     header_row = start_row + 2
     for c,h in enumerate(headers, start=1):
         cell = ws.cell(row=header_row, column=c, value=h)
@@ -453,8 +462,8 @@ def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_r
         cell.alignment = Alignment(horizontal="center")
     r = header_row + 1
     for item in items_rows:
-        iid, stored_at, activity_mci, permitted, recommended = item
-        ws.cell(row=r, column=1, value=iid)
+        iid, item_label, stored_at, activity_mci, permitted, recommended = item
+        ws.cell(row=r, column=1, value=item_label)
         ws.cell(row=r, column=2, value=stored_at)
         ws.cell(row=r, column=3, value=float(activity_mci))
         ws.cell(row=r, column=4, value=permitted)
@@ -469,7 +478,7 @@ def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_r
         if cw is None or cw < w:
             ws.column_dimensions[col].width = w
     for item in items_rows:
-        iid, stored_at, activity_mci, permitted, recommended = item
+        iid, item_label, stored_at, activity_mci, permitted, recommended = item
         cur.execute("INSERT INTO disposed_tc99m_batches (batch_id, item_id, stored_at, activity_mci, permitted_date, recommended_date, limit_mci)"
                     "VALUES (?,?,?,?,?,?,?)", (batch_name, iid, stored_at, float(activity_mci), permitted, recommended, float(limit_mci)))
     conn.commit()
@@ -682,7 +691,10 @@ def init_storage_files(batch_path):
     xlsx_path = os.path.join(batch_path, "storage.xlsx")
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS stored_items (id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cur.execute("""CREATE TABLE IF NOT EXISTS stored_items (id TEXT PRIMARY KEY,
+                                                            source_parent_id TEXT,
+                                                            item_label TEXT,
+                                                            kit_name TEXT,
                                                             stored_at TEXT,
                                                             activity_mci REAL,
                                                             permitted_date TEXT,
@@ -698,23 +710,24 @@ def init_storage_files(batch_path):
     return db_path, xlsx_path
 
 #=====STORE TC99M ITEM IN SQLITE+XLSX=====
-def store_tc99m_item(stored_at, activity_mci, permitted_date=None, recommended_date=None):
+def store_tc99m_item(item_id, source_parent_id, item_label, kit_name, stored_at, activity_mci, permitted_date=None, recommended_date=None):
     batch_path = get_active_batch()
     db_path, xlsx_path = init_storage_files(batch_path)
     if permitted_date is None or recommended_date is None:
         recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE, activity_mci=float(activity_mci), stored_at=stored_at)
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("INSERT INTO stored_items (stored_at, activity_mci, permitted_date, recommended_date) VALUES (?,?,?,?)",
-                (stored_at, float(activity_mci), permitted_date, recommended_date))
+    cur.execute("INSERT OR IGNORE INTO stored_items (id, source_parent_id, item_label, kit_name, stored_at, activity_mci, permitted_date, recommended_date) VALUES (?,?,?,?,?,?,?,?)",
+                (item_id, str(source_parent_id), item_label, kit_name, stored_at, float(activity_mci), permitted_date, recommended_date))
+    inserted = cur.rowcount
     conn.commit()
-    new_id = cur.lastrowid
     conn.close()
-    wb = load_workbook(xlsx_path)
-    ws = wb["Stored Items"]
-    ws.append([new_id, stored_at, float(activity_mci), permitted_date, recommended_date])
-    wb.save(xlsx_path)
-    return new_id, batch_path
+    if inserted:
+        wb = load_workbook(xlsx_path)
+        ws = wb["Stored Items"]
+        ws.append([item_id, stored_at, float(activity_mci), permitted_date, recommended_date])
+        wb.save(xlsx_path)
+    return item_id, batch_path
 
 #=====READ ITEMS INFO=====
 def read_tc99m_items(batch_path=None):
@@ -725,6 +738,57 @@ def read_tc99m_items(batch_path=None):
         return []
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    rows = cur.execute("SELECT id, stored_at, activity_mci, permitted_date, recommended_date FROM stored_items ORDER BY id").fetchall()
+    rows = cur.execute("SELECT id, item_label, stored_at, activity_mci, permitted_date, recommended_date FROM stored_items ORDER BY stored_at, id").fetchall()
     conn.close()
     return rows
+
+#====SYNC TC99M GEN FOR DISPOSAL=====
+def sync_tc99m_gen_for_disposal(dbfile):
+    conn = sqlite3.connect(dbfile)
+    cur = conn.cursor()
+    cols = [r[1] for r in cur.execute("PRAGMA table_info(kits)").fetchall()]
+    if "stored_to_disposal" not in cols:
+        cur.execute("ALTER TABLE kits ADD COLUMN stored_to_disposal INTEGER DEFAULT 0")
+    if "stored_to_disposal_at" not in cols:
+        cur.execute("ALTER TABLE kits ADD COLUMN stored_to_disposal_at TEXT")
+    if "disposal_item_id" not in cols:
+        cur.execute("ALTER TABLE kits ADD COLUMN disposal_item_id TEXT")
+    conn.commit()
+    today = datetime.now().date()
+    rows = cur.execute("SELECT id, date, time, kit, concentration, volume_left "
+                       "FROM kits "
+                       "WHERE parent_id IS NULL "
+                       "AND COALESCE(stored_to_disposal, 0) = 0 "
+                       "ORDER BY date, time").fetchall()
+    synced_count = 0
+    for parent_id, kit_date_str, kit_time_str, kit_name, concentration, volume_left in rows:
+        try:
+            kit_date = datetime.strptime(kit_date_str, DATE_FORMAT).date()
+        except ValueError:
+            continue
+        if kit_date >= today:
+            continue
+        concentration = float(concentration or 0)
+        volume_left = float(volume_left or 0)
+        residual_activity = round(concentration * volume_left, 2)
+        stored_at = kit_date_str
+        item_id = f"{datetime.strptime(kit_date_str, DATE_FORMAT).strftime('%Y%m%d')}-{kit_name}-{parent_id}"
+        item_label = f"{kit_name}"
+        if residual_activity > 0:
+            recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE,
+                                                                                      activity_mci=residual_activity,
+                                                                                      stored_at=stored_at)
+            store_tc99m_item(item_id=item_id,
+                             source_parent_id=parent_id,
+                             item_label=item_label,
+                             kit_name=kit_name,
+                             stored_at=stored_at,
+                             activity_mci=residual_activity,
+                             permitted_date=permitted_date,
+                             recommended_date=recommended_date)
+        cur.execute("UPDATE kits SET stored_to_disposal = 1, stored_to_disposal_at = ?, disposal_item_id = ? WHERE id=?",
+                    (datetime.now().strftime(DATE_FORMAT), item_id, parent_id))
+        synced_count += 1
+    conn.commit()
+    conn.close()
+    return synced_count

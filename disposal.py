@@ -14,7 +14,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
     btns = Frame(parent_tab, bg=C4)
     btns.pack(pady=(10,15))
     #Tree
-    columns = [("Vials", 100), ("Cal Date", 110), ("Stored at", 110), ("Activity(mCi)", 140), ("Permitted Date", 140), ("Recommended Date", 160), ("Limit(mCi)", 100), ("Status", 90),]
+    columns = [("Vials", 100), ("Cal Date", 110), ("Stored at", 110), ("Activity(mCi)", 140), ("Permitted Date", 140), ("Recommended Date", 180), ("Limit(mCi)", 100), ("Status", 90),]
     tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=16)
     tree.pack(pady=(10,0))
     for col_name, col_width in columns:
@@ -301,10 +301,10 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
         tree.delete(*tree.get_children())
         summary_rows = []
         for r in rows:
-            iid, stored_at, activity_mci, permitted, recommended = r
+            iid, item_label, stored_at, activity_mci, permitted, recommended = r
             status = disposal_status(recommended, permitted)
-            tree.insert("", "end", iid=iid, values=[iid, stored_at, float(activity_mci), permitted, recommended, status], tags=(status,))
-            summary_rows.append((iid, TC99M_NUCLIDE, stored_at, float(activity_mci), permitted, recommended, None))
+            tree.insert("", "end", iid=iid, values=[item_label, stored_at, float(activity_mci), permitted, recommended, status], tags=(status,))
+            summary_rows.append((iid, TC99M_NUCLIDE, None, stored_at, float(activity_mci), permitted, recommended, None))
             total_items, total_activity, ready_count = disposal_summary(summary_rows)
             summary_label.config(text=f"Total vials: {total_items}   |   Total activity ATM: {total_activity} mCi   |   READY: {ready_count}")
             created_at, finalized_at, disposed_at = read_batch_info(batch_path)
