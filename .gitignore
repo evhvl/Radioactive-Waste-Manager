@@ -1,8 +1,14 @@
 .venv/
+env/
+.idea/
+.vscode/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 *.db
 *.sqlite
 *.xlsx
 *.pdf
+*.log
 Disposals/Logs
