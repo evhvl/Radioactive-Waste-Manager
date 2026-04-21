@@ -15,8 +15,8 @@ def build_tab(app, tab, vial_name):
         popup_window = Toplevel(app.window)
         popup_window.title("Choose File")
         popup_window.config(bg=C4)
-        center_window(window=popup_window, w=350, h=250)
-        Label(popup_window, text=f"Select {vial_name} File:", **TEXT_COLORS, font=(FONT_NAME, 16, "bold")).pack(pady=20)
+        center_window(window=popup_window, w=420, h=250)
+        Label(popup_window, text=f"Select {vial_name} File:", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=20)
 
         def create_new():
             popup_window.destroy()
@@ -34,16 +34,16 @@ def build_tab(app, tab, vial_name):
         popup = Toplevel(app.window)
         popup.title(f"New {vial_name} Vial")
         popup.config(bg=C4)
-        center_window(window=popup, w=350, h=290)
-        Label(popup, text=f"New {vial_name} Vial Info", **TEXT_COLORS, font=(FONT_NAME, 16, "bold")).pack(pady=10)
+        center_window(window=popup, w=420, h=320)
+        Label(popup, text=f"New {vial_name} Vial Info", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=10)
         info_frame = Frame(popup, bg=C4)
         info_frame.pack(pady=10)
-        Label(info_frame, text="Calibration Date:", **TEXT_COLORS).grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Calibration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=0, sticky="e", padx=5, pady=5)
         date_entry = DateEntry(info_frame, width=12, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         date_entry.grid(row=0, column=1, pady=5)
         time_field = Frame(info_frame, bg="white", highlightbackground="black", highlightthickness=0)
         time_field.grid(row=1, column=1, padx=5)
-        Label(info_frame, text="Calibration Time:", **TEXT_COLORS).grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Calibration Time:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=0, sticky="e", padx=5, pady=5)
         time_entry = Entry(time_field, width=9, bd=0, font=(FONT_NAME, 10))
         time_entry.pack(side="left", padx=(3, 0), pady=2)
         update_time(time_entry)
@@ -51,13 +51,13 @@ def build_tab(app, tab, vial_name):
                                      fg="black", bd=0,
                                      padx=3, pady=0, font=(FONT_NAME, 10), cursor="hand2")
         refresh_time_button.pack(side="right", padx=3)
-        Label(info_frame, text="Activity (mCi):", **TEXT_COLORS).grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=2, column=0, sticky="e", padx=5, pady=5)
         activity_entry = Entry(info_frame, width=14)
         activity_entry.grid(row=2, column=1, pady=5)
-        Label(info_frame, text="Volume (ml):", **TEXT_COLORS).grid(row=3, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Volume (ml):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=3, column=0, sticky="e", padx=5, pady=5)
         volume_entry = Entry(info_frame, width=14)
         volume_entry.grid(row=3, column=1, pady=5)
-        Label(info_frame, text="Expiration Date:", **TEXT_COLORS).grid(row=4, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Expiration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=4, column=0, sticky="e", padx=5, pady=5)
         expiration_entry = DateEntry(info_frame, width=12, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         expiration_entry.grid(row=4, column=1, pady=5)
 
@@ -121,10 +121,10 @@ def build_tab(app, tab, vial_name):
         bttn_frame.pack()
         Button(bttn_frame, text="Save File",
                **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=8,
-               height=1, font=(FONT_NAME, 10, "bold"), command=save_new_vial_file).grid(row=0, column=0, padx=10, pady=10)
+               height=1, font=(FONT_NAME, 12, "bold"), command=save_new_vial_file).grid(row=0, column=0, padx=10, pady=10)
         Button(bttn_frame, text="Back",
                **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=8, height=1,
-               font=(FONT_NAME, 10, "bold"),
+               font=(FONT_NAME, 12, "bold"),
                command=lambda: (popup.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Vials"))).grid(row=0, column=1, padx=10, pady=10)
 
     # =====Open Old File=====
@@ -132,9 +132,8 @@ def build_tab(app, tab, vial_name):
         popup = Toplevel(app.window)
         popup.title(f"Open Existing {vial_name} Vial File")
         popup.config(bg=C4)
-        center_window(window=popup, w=360, h=130)
-        Label(popup, text=f"Select Existing {vial_name} Folder", **TEXT_COLORS, font=(FONT_NAME, 17, "bold")).pack(
-            pady=10)
+        center_window(window=popup, w=420, h=160)
+        Label(popup, text=f"Select Existing {vial_name} Folder", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=10)
 
         def open_folder():
             base_dir = Path(__file__).resolve().parent / "Vials"
@@ -153,18 +152,17 @@ def build_tab(app, tab, vial_name):
         button_frame.pack()
         Button(button_frame, text="Open File 🗁",
                **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=12, height=2, font=(FONT_NAME, 12, "bold"), command=open_folder).grid(row=0, column=0, padx=10,
-                                                                                           pady=10)
+               width=14, height=2, font=(FONT_NAME, 14, "bold"), command=open_folder).grid(row=0, column=0, padx=10, pady=10)
         Button(button_frame, text="Back",
-               **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=12,
-               height=2, font=(FONT_NAME, 12, "bold"),
+               **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=14,
+               height=2, font=(FONT_NAME, 14, "bold"),
                command=lambda: (popup.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Vials"))).grid(row=0, column=1, padx=10, pady=10)
 
     # =====Load Tab=====
     def load_vial(dbfile):
         for widget in tab.winfo_children():
             widget.destroy()
-        header = Label(tab, text=f"{vial_name} Log Sheet", **TEXT_COLORS, font=(FONT_NAME, 18, "bold"))
+        header = Label(tab, text=f"{vial_name} Log Sheet", **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
         header.pack(pady=(5, 0), fill="x")
         conn = sqlite3.connect(dbfile)
         cur = conn.cursor()
@@ -184,11 +182,11 @@ def build_tab(app, tab, vial_name):
         half_life = next(hl for name, hl in VIAL_DATA if name == vial_name)
         info_frame = Frame(tab, bg=C4)
         info_frame.pack(anchor="center", pady=20)
-        Label(info_frame, text=f"Calibration on: {date} {time}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Activity (mCi): {activity}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Conc (mCi/ml): {conc}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=2, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"T1/2 {vial_name} (HR): {half_life}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=0, column=1, padx=6, pady=6)
-        Label(info_frame, text=f"Expiration Date: {exp_date}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=1, column=1, padx=6, pady=6)
+        Label(info_frame, text=f"Calibration on: {date} {time}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=0, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Activity (mCi): {activity}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Conc (mCi/ml): {conc}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=2, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"T1/2 {vial_name} (HR): {half_life}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=1, padx=6, pady=6)
+        Label(info_frame, text=f"Expiration Date: {exp_date}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=1, padx=6, pady=6)
 
         # =====Store Vial=====
         def store_current_vial():
@@ -211,10 +209,10 @@ def build_tab(app, tab, vial_name):
             popup = Toplevel(tab)
             popup.title("Enter Residual")
             popup.config(bg=C4, pady=12, padx=13)
-            center_window(popup, 300, 140)
-            Label(popup, text="Residual Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 11, "bold")).pack(pady=(5,6))
+            center_window(popup, 320, 140)
+            Label(popup, text="Residual Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 16, "bold")).pack(pady=(5,6))
             res_var = StringVar(value=f"{calculated_activity_mci:.2f}")
-            res_entry = Entry(popup, width=12, textvariable=res_var, font=(FONT_NAME, 12))
+            res_entry = Entry(popup, width=12, textvariable=res_var, font=(FONT_NAME, 14))
             res_entry.pack(pady=(0,10))
             res_entry.focus_set()
             res_entry.selection_range(0, "end")
@@ -262,23 +260,23 @@ def build_tab(app, tab, vial_name):
             messagebox.showinfo("Vial Stored",f"{vial_name} vial stored successfully.\n\nRecommended disposal after: {recommended}\nPermitted disposal after: {permitted}")
 
         dispose_button = Button(info_frame, text="✗Store Vial✗",**{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                                width=14, height=1, font=(FONT_NAME, 10, "bold"), command=store_current_vial)
+                                width=14, height=1, font=(FONT_NAME, 12, "bold"), command=store_current_vial)
         dispose_button.grid(row=2, column=1, padx=6, pady=6)
 
         # Table
-        columns = [("cal_date", "Date", 120), ("cal_time", "Time", 100), ("patient_name", "Patient", 160),
-                   ("concentration", "Conc(mCi/ml)", 120), ("dose", "Dose(mCi)", 100), ("volume", "Vol(ml)", 90),
-                   ("volume_left", "Vol Left(ml)", 100)]
-        tree = ttk.Treeview(tab, columns=[c[0] for c in columns], show="headings", height=8)
+        columns = [("cal_date", "Date", 150), ("cal_time", "Time", 120), ("patient_name", "Patient", 180),
+                   ("concentration", "Conc(mCi/ml)", 140), ("dose", "Dose(mCi)", 120), ("volume", "Vol(ml)", 120),
+                   ("volume_left", "Vol Left(ml)", 120)]
+        tree = ttk.Treeview(tab, columns=[c[0] for c in columns], show="headings", height=12)
         tree.pack(pady=10)
         for col_id, col_title, col_width in columns:
             tree.heading(col_id, text=col_title)
             tree.column(col_id, width=col_width, anchor="center")
         style = ttk.Style()
         style.theme_use("default")
-        style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", rowheight=26, borderwidth=1,
+        style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", font=(FONT_NAME,12), rowheight=26, borderwidth=1,
                         bordercolor="black", relief="solid")
-        style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 11, "bold"),
+        style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 14, "bold"),
                         relief="solid")
         style.map("Treeview", background=[("selected", "#8FAADC"), ("!selected", C2)],
                   foreground=[("selected", "black")])
@@ -298,23 +296,23 @@ def build_tab(app, tab, vial_name):
         # =====Add New Data=====
         add_frame = Frame(tab, bg=C4)
         add_frame.pack(pady=10)
-        Label(add_frame, text="Date:", **TEXT_COLORS).grid(row=0, column=0)
+        Label(add_frame, text="Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=0)
         admin_date_entry = DateEntry(add_frame, width=10, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         admin_date_entry.grid(row=0, column=1, padx=5)
         time_field = Frame(add_frame, bg="white", highlightbackground="black", highlightthickness=0)
         time_field.grid(row=0, column=3, padx=5)
-        Label(add_frame, text="Admin Time:", **TEXT_COLORS).grid(row=0, column=2, sticky="e", padx=5)
+        Label(add_frame, text="Admin Time:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=2, sticky="e", padx=5)
         admin_time_entry = Entry(time_field, width=5, bd=0, font=(FONT_NAME, 10))
         admin_time_entry.pack(side="left", padx=(3, 0), pady=2)
         update_time(admin_time_entry)
         refresh_time_button = Button(time_field, text="↻", command=lambda nt=admin_time_entry: update_time(nt), bg="white",
                                      fg="black", bd=0, padx=3, pady=0, font=(FONT_NAME, 10), cursor="hand2")
         refresh_time_button.pack(side="right", padx=3)
-        Label(add_frame, text="Patient Name:", **TEXT_COLORS).grid(row=0, column=4, sticky="e", padx=5)
+        Label(add_frame, text="Patient Name:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=4, sticky="e", padx=5)
         patient_name_entry = Entry(add_frame, width=18)
         patient_name_entry.insert(0, "-")
         patient_name_entry.grid(row=0, column=5, padx=5)
-        Label(add_frame, text="Dose (mCi):", **TEXT_COLORS).grid(row=0, column=6, sticky="e", padx=5)
+        Label(add_frame, text="Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=6, sticky="e", padx=5)
         dose_entry = Entry(add_frame, width=8)
         dose_entry.grid(row=0, column=7, padx=5)
 
@@ -395,9 +393,9 @@ def build_tab(app, tab, vial_name):
                 popup = Toplevel(tab)
                 popup.title("Insert Actual Administration Values")
                 popup.config(bg=C4, pady=15)
-                center_window(popup, 250, 120)
-                Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=10, pady=5)
-                dose_actual_entry = Entry(popup, width=8)
+                center_window(popup, 290, 120)
+                Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=10, pady=5)
+                dose_actual_entry = Entry(popup, width=10)
                 dose_actual_entry.insert(0, f"{dose}")
                 dose_actual_entry.grid(row=0, column=1)
 
@@ -443,10 +441,10 @@ def build_tab(app, tab, vial_name):
 
                 Button(popup, text="OK", command=save_actual,
                        **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                       width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, pady=10, padx=6)
+                       width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, pady=10, padx=6)
                 Button(popup, text="Cancel", command=popup.destroy,
                        **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['bg', 'width', 'height', 'font']},
-                       bg=C4, width=10, height=2, font=(FONT_NAME, 10, "bold")).grid(row=1, column=1, pady=10, padx=6)
+                       bg=C4, width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=1, pady=10, padx=6)
 
             tree.bind("<Double-1>", on_double_click)
             dose_entry.delete(0, "end")
@@ -494,16 +492,16 @@ def build_tab(app, tab, vial_name):
 
         # ----
         if is_expired and not stored_date and not disposal_date:
-            Label(tab, text="⚠ VIAL EXPIRED – NO ADMINISTRATION ALLOWED", fg="#FF8000", bg=C4, borderwidth=1,
-                  font=(FONT_NAME, 14, "bold")).pack(pady=(5, 0))
+            Label(tab, text="⚠ VIAL EXPIRED – NO ADMINISTRATION ALLOWED", fg="#FF8000", bg=C4, borderwidth=2,
+                  font=(FONT_NAME, 18, "bold")).pack(pady=(5, 0))
             disable_buttons(tab, exempt_texts=["Back", "✗Store Vial✗"])
         elif stored_date and not disposal_date:
-            Label(tab, text=f"⚠ VIAL STORED ({stored_date})-NO FURTHER ACTIONS ALLOWED", fg="#CC0000", bg=C4, borderwidth=1,
-                  font=(FONT_NAME, 14, "bold"), justify="center").pack(pady=(5, 0))
+            Label(tab, text=f"⚠ VIAL STORED ({stored_date})-NO FURTHER ACTIONS ALLOWED", fg="#CC0000", bg=C4, borderwidth=2,
+                  font=(FONT_NAME, 18, "bold"), justify="center").pack(pady=(5, 0))
             disable_buttons(tab, exempt_texts=["Back"])
         elif disposal_date:
-            Label(tab, text=f"⚠ VIAL DISPOSED ({disposal_date})-NO FURTHER ACTIONS ALLOWED", fg="#660000", bg=C4, borderwidth=1,
-                  font=(FONT_NAME, 14, "bold"), justify="center").pack(pady=(5, 0))
+            Label(tab, text=f"⚠ VIAL DISPOSED ({disposal_date})-NO FURTHER ACTIONS ALLOWED", fg="#660000", bg=C4, borderwidth=2,
+                  font=(FONT_NAME, 18, "bold"), justify="center").pack(pady=(5, 0))
             disable_buttons(tab, exempt_texts=["Back"])
 
         # =====Main Buttons=====

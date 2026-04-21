@@ -45,7 +45,7 @@ class Tabs:
     def _tab_vials(self, tab):
         content_frame = Frame(tab, bg=C4)
         content_frame.place(relx=0.5, rely=0.5, anchor="center")
-        Label(content_frame, text="Select New Radionuclide:", bg=C4, fg="white", font=(FONT_NAME, 24, "bold")).grid(columnspan=3, column=0, row=0, pady=(0, 20))
+        Label(content_frame, text="Select New Radionuclide:", bg=C4, fg="white", font=(FONT_NAME, 30, "bold")).grid(columnspan=3, column=0, row=0, pady=(0, 20))
         for idx, (name,_) in enumerate(VIAL_DATA):
             r = idx // 3 + 1
             c = idx % 3

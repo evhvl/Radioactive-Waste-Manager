@@ -6,30 +6,30 @@ import os, pandas, sqlite3
 
 def build_tab(app, tab):
 
-    header = Label(tab, text="I-131 Calculator", **TEXT_COLORS, font=(FONT_NAME, 24, "bold"))
+    header = Label(tab, text="I-131 Calculator", **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
     header.pack(pady=10)
     frm = Frame(tab, bg=C4)
     frm.pack(pady=10)
 
     # Labels + Entries
-    Label(frm, text="Calibration Date :", **TEXT_COLORS).grid(row=0, column=0, sticky="e", padx=6, pady=6)
+    Label(frm, text="Calibration Date :", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=0, column=0, sticky="e", padx=6, pady=6)
     calib_entry = DateEntry(frm, width=16, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
     calib_entry.grid(row=0, column=1, padx=6, pady=6)
-    Label(frm, text="Calibration Date Activity (MBq):", **TEXT_COLORS).grid(row=1, column=0, sticky="e", padx=6, pady=6)
+    Label(frm, text="Calibration Date Activity (MBq):", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=1, column=0, sticky="e", padx=6, pady=6)
     activity_entry = Entry(frm, width=18)
     activity_entry.grid(row=1, column=1, padx=6, pady=6)
-    Label(frm, text="Administration Date :", **TEXT_COLORS).grid(row=2, column=0, sticky="e", padx=6, pady=6)
+    Label(frm, text="Administration Date :", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=2, column=0, sticky="e", padx=6, pady=6)
     admin_entry = DateEntry(frm, width=16, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
     admin_entry.grid(row=2, column=1, padx=6, pady=6)
-    Label(frm, text="Patient Name :", **TEXT_COLORS).grid(row=3, column=0, sticky="e", padx=6, pady=6)
+    Label(frm, text="Patient Name :", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=3, column=0, sticky="e", padx=6, pady=6)
     name_entry = Entry(frm, width=18)
     name_entry.insert(0, "-")
     name_entry.grid(row=3, column=1, padx=6, pady=6)
-    Label(frm, text="Serial Number:", **TEXT_COLORS).grid(row=4, column=0, sticky="e", padx=6, pady=6)
+    Label(frm, text="Serial Number:", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=4, column=0, sticky="e", padx=6, pady=6)
     serial_number_entry = Entry(frm, width=18)
     serial_number_entry.grid(row=4, column=1, padx=6, pady=6)
     # Result
-    result_txt = Text(tab, height=14, width=60, bg=BG, fg="white")
+    result_txt = Text(tab, height=18, width=90, bg=BG, fg="white")
     result_txt.pack(pady=12)
     result_txt.configure(state="disabled")
 
@@ -53,8 +53,8 @@ def build_tab(app, tab):
             # Show Output
             result_txt.configure(state="normal")
             result_txt.delete("1.0", END)
-            result_txt.tag_configure("normal", font=("Courier", 9, "normal"))
-            result_txt.tag_configure("bold", font=("Courier", 11, "bold"))
+            result_txt.tag_configure("normal", font=("Courier", 12, "normal"))
+            result_txt.tag_configure("bold", font=("Courier", 14, "bold"))
             result_txt.insert(END, f"Patient Name: {patient_name}\n\n", "bold")
             result_txt.insert(END, f"Calibration Date: {cal_date.strftime("%d-%m-%Y")}\n\n", "normal")
             result_txt.insert(END,

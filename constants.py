@@ -13,25 +13,25 @@ BUTTON_STYLE = {
     "height": 2,
     "cursor": "hand2",
     "highlightthickness": 0,
-    "font": (FONT_NAME, 16, "bold")
+    "font": (FONT_NAME, 18, "bold")
 }
 TAB_BUTTON_STYLE = {
     "background": BG,
     "foreground": "white",
     "activebackground": BG,
     "activeforeground": "white",
-    "width": 12,
+    "width": 14,
     "height": 2,
     "cursor": "hand2",
     "highlightthickness": 0,
-    "font": (FONT_NAME, 14, "bold")
+    "font": (FONT_NAME, 16, "bold")
 }
 GEN_BUTTON_STYLE = {
     "bg" : BG,
     "fg" : "white",
-    "width" : 10,
-    "height" : 2,
-    "font" : (FONT_NAME,30,"bold"),
+    "width" : 15,
+    "height" : 3,
+    "font" : (FONT_NAME,35,"bold"),
     "activebackground" : "white",
     "activeforeground" : BG,
     "cursor" : "hand2",

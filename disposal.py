@@ -9,21 +9,21 @@ from functions import *
 def build_vials_disposal_tab(parent_tab, *, on_back=None):
     for w in parent_tab.winfo_children():
         w.destroy()
-    header = Label(parent_tab, text="VIALS DISPOSAL (LIVE STORAGE)", **TEXT_COLORS, font=(FONT_NAME, 18, "bold"))
+    header = Label(parent_tab, text="VIALS DISPOSAL (LIVE STORAGE)", **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
     header.pack(pady=(10,5), fill="x")
     btns = Frame(parent_tab, bg=C4)
     btns.pack(pady=(10,15))
     #Tree
-    columns = [("Vials", 75), ("Cal Date", 95), ("Stored at", 95), ("Activity(mCi)", 110), ("Permitted Date", 120), ("Recommended Date", 150), ("Limit(mCi)", 90), ("Status", 80),]
-    tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=12)
+    columns = [("Vials", 100), ("Cal Date", 110), ("Stored at", 110), ("Activity(mCi)", 140), ("Permitted Date", 140), ("Recommended Date", 160), ("Limit(mCi)", 100), ("Status", 90),]
+    tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=16)
     tree.pack(pady=(10,0))
     for col_name, col_width in columns:
         tree.heading(col_name, text=col_name)
         tree.column(col_name, anchor="center", width=col_width, stretch=False)
     style = ttk.Style()
     style.theme_use("default")
-    style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", rowheight=26, borderwidth=1, bordercolor="black", relief="solid")
-    style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 11, "bold"), relief="solid")
+    style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", font=(FONT_NAME, 12), rowheight=26, borderwidth=1, bordercolor="black", relief="solid")
+    style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 14, "bold"), relief="solid")
     style.map("Treeview", background=[("selected", "#8FAADC"), ("!selected", C2)], foreground=[("selected", "black")])
     style.layout("Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
     tree.tag_configure("STORED", background="#CDECCF")
@@ -31,7 +31,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
     tree.tag_configure("READY", background="#F6B3B3")
     summary_frame = Frame(parent_tab, bg=C4)
     summary_frame.pack(pady=(15,15))
-    summary_label = Label(summary_frame, text="", **TEXT_COLORS, font=(FONT_NAME, 12, "bold"))
+    summary_label = Label(summary_frame, text="", **TEXT_COLORS, font=(FONT_NAME, 14, "bold"))
     summary_label.pack()
     #Functions
     def load_live_storage():
@@ -134,18 +134,19 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
         messagebox.showinfo("Check READY", "\n".join(lines))
         popup = Toplevel(parent_tab)
         popup.title("Eligible READY Vials (by radionuclide)")
-        Label(popup, text="Select radionuclides to dispose", **TEXT_COLORS, font=(FONT_NAME, 18, "bold")).pack(pady=(0, 10))
+        Label(popup, text="Select radionuclides to dispose", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=(10, 10))
         cols = ("Radionuclide", "Total A ATM(mCi)", "Limit(mCi)", "Count")
         t_groups = ttk.Treeview(popup, columns=cols, show="headings", height=6, selectmode="extended")
         for c in cols:
             t_groups.heading(c, text=c)
             t_groups.column(c, anchor="center", width=160, stretch=False)
         t_groups.column("Radionuclide", width=160)
+        t_groups.column("Total A ATM(mCi)", width=180)
         t_groups.column("Count", width=90)
         t_groups.pack(pady=(0, 10))
         det_cols = ("ID", "Nuclide", "Cal Date", "Stored at", "A0(mCi)", "A Now(mCi)", "Permitted")
         t_det = ttk.Treeview(popup, columns=det_cols, show="headings", height=10)
-        widths = [70, 80, 95, 95, 90, 95, 95]
+        widths = [80, 90, 105, 105, 100, 110, 105]
         for c, w in zip(det_cols, widths):
             t_det.heading(c, text=c)
             t_det.column(c, anchor="center", width=w, stretch=False)
@@ -232,11 +233,11 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
         btn_row = Frame(popup, bg=C4)
         btn_row.pack(pady=(15, 0))
         Button(btn_row, text="Print PDF", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=10, height=2, font=(FONT_NAME, 10, "bold"), command=export_pdf).grid(row=0, column=0, padx=6)
+               width=12, height=2, font=(FONT_NAME, 14, "bold"), command=export_pdf).grid(row=0, column=0, padx=6)
         Button(btn_row, text="OK", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=10, height=2, font=(FONT_NAME, 10, "bold"), command=dispose_selected_groups).grid(row=0, column=1, padx=6)
+               width=12, height=2, font=(FONT_NAME, 14, "bold"), command=dispose_selected_groups).grid(row=0, column=1, padx=6)
         Button(btn_row, text="Close", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=10, height=2, font=(FONT_NAME, 10, "bold"), command=popup.destroy).grid(row=0, column=2, padx=6)
+               width=12, height=2, font=(FONT_NAME, 14, "bold"), command=popup.destroy).grid(row=0, column=2, padx=6)
         popup.update_idletasks()
         width = popup.winfo_reqwidth() + 100
         height = popup.winfo_reqheight() + 40
@@ -245,11 +246,11 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
         popup.configure(bg=C4)
         center_window(popup, width, height)
     Button(btns, text="Refresh", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-            width=10, height=1, font=(FONT_NAME, 10, "bold"), command=refresh).grid(row=0, column=0, padx=6)
+            width=12, height=1, font=(FONT_NAME, 12, "bold"), command=refresh).grid(row=0, column=0, padx=6)
     Button(btns, text="Check READY", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-           width=14, height=1, font=(FONT_NAME, 10, "bold"), command=check_ready_vials).grid(row=0, column=1, padx=6)
+           width=14, height=1, font=(FONT_NAME, 12, "bold"), command=check_ready_vials).grid(row=0, column=1, padx=6)
     Button(btns, text="✗Dispose Selected✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-            width=18, height=1, font=(FONT_NAME, 10, "bold"), command=dispose_selected_vials).grid(row=0, column=2, padx=6)
+            width=20, height=1, font=(FONT_NAME, 12, "bold"), command=dispose_selected_vials).grid(row=0, column=2, padx=6)
     if on_back:
         Button(parent_tab, text="Back", **TAB_BUTTON_STYLE, command=on_back).pack(pady=(0, 10))
     def auto_refresh():
@@ -263,13 +264,13 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
     for w in parent_tab.winfo_children():
         w.destroy()
     state = {"batch_path": None, "read_only": False}
-    header = Label(parent_tab, text="TC99M DISPOSAL BATCH", **TEXT_COLORS, font=(FONT_NAME, 18, "bold"))
+    header = Label(parent_tab, text="TC99M DISPOSAL BATCH", **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
     header.pack(pady=(10,5), fill="x")
     frame = Frame(parent_tab, bg=C4)
     frame.pack(pady=5)
-    batch_label = Label(frame, text="", **TEXT_COLORS, font=(FONT_NAME, 12, "bold"))
+    batch_label = Label(frame, text="", **TEXT_COLORS, font=(FONT_NAME, 14, "bold"))
     batch_label.grid(row=0, column=0, padx=10)
-    mode_label = Label(frame, text="", bg=C4, fg="orange", font=(FONT_NAME, 10, "bold"))
+    mode_label = Label(frame, text="", bg=C4, fg="orange", font=(FONT_NAME, 12, "bold"))
     mode_label.grid(row=1, column=0, padx=10)
     action_btn = None
     #Fuctions
@@ -337,22 +338,22 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
         load_batch(new_batch, read_only=False)
     btns = Frame(parent_tab, bg=C4)
     btns.pack(pady=(10,15))
-    Button(btns, text="Refresh", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=10, height=1, font=(FONT_NAME, 10, "bold"), command=refresh).grid(row=0, column=0, padx=6)
-    Button(btns, text="Open Old Batch",**{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=14, height=1, font=(FONT_NAME, 10, "bold"), command=open_old_batch).grid(row=0, column=1, padx=6)
-    Button(btns, text="Back to Active", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=14, height=1, font=(FONT_NAME, 10, "bold"), command=load_active).grid(row=0, column=2, padx=6)
-    action_btn = Button(btns, text="✗Finalize Batch✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=16, height=1, font=(FONT_NAME, 10, "bold"), command=finalize_batch)
+    Button(btns, text="Refresh", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=12, height=1, font=(FONT_NAME, 12, "bold"), command=refresh).grid(row=0, column=0, padx=6)
+    Button(btns, text="Open Old Batch",**{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=14, height=1, font=(FONT_NAME, 12, "bold"), command=open_old_batch).grid(row=0, column=1, padx=6)
+    Button(btns, text="Back to Active", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=14, height=1, font=(FONT_NAME, 12, "bold"), command=load_active).grid(row=0, column=2, padx=6)
+    action_btn = Button(btns, text="✗Finalize Batch✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=16, height=1, font=(FONT_NAME, 12, "bold"), command=finalize_batch)
     action_btn.grid(row=0, column=3, padx=6)
     #Tree
-    columns = [("Item", 80), ("Stored at", 95), ("Activity (mCi)", 110), ("Permitted Date", 120), ("Recommended Date", 150), ("Status", 85),]
-    tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=11)
+    columns = [("Item", 100), ("Stored at", 120), ("Activity (mCi)", 140), ("Permitted Date", 150), ("Recommended Date", 180), ("Status", 90),]
+    tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=14)
     tree.pack(pady=(10,0))
     for col_name, col_width in columns:
         tree.heading(col_name, text=col_name)
         tree.column(col_name, anchor="center", width=col_width, stretch=False)
     style = ttk.Style()
     style.theme_use("default")
-    style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", rowheight=26, borderwidth=1, bordercolor="black", relief="solid")
-    style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 11, "bold"), relief="solid")
+    style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", font=(FONT_NAME,12), rowheight=26, borderwidth=1, bordercolor="black", relief="solid")
+    style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 14, "bold"), relief="solid")
     style.map("Treeview", background=[("selected", "#8FAADC"), ("!selected", C2)], foreground=[("selected", "black")])
     style.layout("Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
     tree.tag_configure("STORED", background="#CDECCF")
@@ -360,7 +361,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
     tree.tag_configure("READY", background="#F6B3B3")
     summary_frame = Frame(parent_tab, bg=C4)
     summary_frame.pack(pady=(5,10))
-    summary_label = Label(summary_frame, text="", **TEXT_COLORS, font=(FONT_NAME, 12, "bold"))
+    summary_label = Label(summary_frame, text="", **TEXT_COLORS, font=(FONT_NAME, 14, "bold"))
     summary_label.pack()
     if on_back:
         Button(parent_tab, text="Back", **TAB_BUTTON_STYLE, command=on_back).pack(pady=(0,10))

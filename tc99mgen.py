@@ -15,9 +15,8 @@ def build_tab(app, tab):
         popup_window = Toplevel(app.window)
         popup_window.title("Choose File")
         popup_window.config(bg=C4)
-        center_window(window=popup_window, w=350, h=250)
-        Label(popup_window, text=f"Select Tc99m Generator File:", **TEXT_COLORS, font=(FONT_NAME, 16, "bold")).pack(
-            pady=20)
+        center_window(window=popup_window, w=420, h=250)
+        Label(popup_window, text=f"Select Tc99m Generator File:", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=20)
 
         def create_new():
             popup_window.destroy()
@@ -35,18 +34,18 @@ def build_tab(app, tab):
         popup_window = Toplevel(app.window)
         popup_window.title("New Tc99m Generator")
         popup_window.config(bg=C4)
-        center_window(window=popup_window, w=420, h=320)
-        Label(popup_window, text="New Generator Info", **TEXT_COLORS, font=(FONT_NAME, 16, "bold")).pack(pady=10)
+        center_window(window=popup_window, w=420, h=360)
+        Label(popup_window, text="New Generator Info", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=10)
         info_frame = Frame(popup_window, bg=C4)
         info_frame.pack(pady=10)
-        Label(info_frame, text="Generator ID:", **TEXT_COLORS).grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Generator ID:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=0, sticky="e", padx=5, pady=5)
         gen_id_entry = Entry(info_frame, width=18)
         gen_id_entry.insert(0, "-")
         gen_id_entry.grid(row=0, column=1, pady=5)
-        Label(info_frame, text="Calibration Date:", **TEXT_COLORS).grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Calibration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=0, sticky="e", padx=5, pady=5)
         cal_date_entry = DateEntry(info_frame, width=16, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         cal_date_entry.grid(row=1, column=1, pady=5)
-        Label(info_frame, text="Calibration Time:", **TEXT_COLORS).grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Calibration Time:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=2, column=0, sticky="e", padx=5, pady=5)
         time_field = Frame(info_frame, bg="white", highlightbackground="black", highlightthickness=0)
         time_field.grid(row=2, column=1, padx=5)
         cal_time_entry = Entry(time_field, width=13, bd=0, font=(FONT_NAME, 10))
@@ -55,13 +54,13 @@ def build_tab(app, tab):
         refresh_time_button = Button(time_field, text="↻", command=lambda nt=cal_time_entry: update_time(nt), bg="white", fg="black", bd=0,
                                      padx=3, pady=0, font=(FONT_NAME, 10), cursor="hand2")
         refresh_time_button.pack(side="right", padx=3)
-        Label(info_frame, text="Mo99 Activity (mCi):", **TEXT_COLORS).grid(row=3, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Mo99 Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=3, column=0, sticky="e", padx=5, pady=5)
         activity_entry = Entry(info_frame, width=18)
         activity_entry.grid(row=3, column=1, pady=5)
-        Label(info_frame, text="Start Date:", **TEXT_COLORS).grid(row=4, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Start Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=4, column=0, sticky="e", padx=5, pady=5)
         start_date_entry = DateEntry(info_frame, width=16, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         start_date_entry.grid(row=4, column=1, pady=5)
-        Label(info_frame, text="Expiration Date:", **TEXT_COLORS).grid(row=5, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Expiration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=5, column=0, sticky="e", padx=5, pady=5)
         expiration_date_entry = DateEntry(info_frame, width=16, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         expiration_date_entry.grid(row=5, column=1, pady=5)
 
@@ -121,9 +120,9 @@ def build_tab(app, tab):
         bttn_frame = Frame(popup_window, bg=C4)
         bttn_frame.pack()
         Button(bttn_frame, text="Save File",
-               **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=8, height=1, font=(FONT_NAME, 10, "bold"),
+               **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=8, height=1, font=(FONT_NAME, 12, "bold"),
                command=save_new_file).grid(row=0, column=0, padx=10, pady=10)
-        Button(bttn_frame, text="Back", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=8, height=1, font=(FONT_NAME, 10, "bold"),
+        Button(bttn_frame, text="Back", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=8, height=1, font=(FONT_NAME, 12, "bold"),
                command=lambda: (popup_window.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Generators"))).grid(row=0, column=1, padx=10, pady=10)
 
     # =====Open Existing File=====
@@ -131,8 +130,8 @@ def build_tab(app, tab):
         popup_window = Toplevel(app.window)
         popup_window.title("Open Existing Tc99m Generator")
         popup_window.config(bg=C4)
-        center_window(window=popup_window, w=360, h=130)
-        Label(popup_window, text="Select Existing Generator Folder", **TEXT_COLORS, font=(FONT_NAME, 17, "bold")).pack(pady=10)
+        center_window(window=popup_window, w=420, h=160)
+        Label(popup_window, text="Select Existing Generator Folder", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=10)
 
         def open_folder():
             tc99m_root = Path(__file__).resolve().parent / "Tc99m_Generators"
@@ -157,9 +156,9 @@ def build_tab(app, tab):
         button_frame = Frame(popup_window, bg=C4)
         button_frame.pack()
         Button(button_frame, text="Open File 🗁", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=12, height=2, font=(FONT_NAME, 12, "bold"), command=open_folder).grid(row=0, column=0, padx=10, pady=10)
-        Button(button_frame, text="Back", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=12, height=2,
-               font=(FONT_NAME, 12, "bold"), command=lambda: (popup_window.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Generators"))).grid(row=0, column=1, padx=10, pady=10)
+               width=14, height=2, font=(FONT_NAME, 14, "bold"), command=open_folder).grid(row=0, column=0, padx=10, pady=10)
+        Button(button_frame, text="Back", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=14, height=2,
+               font=(FONT_NAME, 14, "bold"), command=lambda: (popup_window.destroy(), app.tabs_frame.forget(tab), app.create_new_tab("Generators"))).grid(row=0, column=1, padx=10, pady=10)
 
     # =====Load Selected Generator=====
     def load_generator(dbfile):
@@ -168,23 +167,22 @@ def build_tab(app, tab):
         conn = sqlite3.connect(dbfile)
         cur = conn.cursor()
         gen_id, cal_date, cal_time, activity, start_date, expiration_date, stored_date, disposal_date, cal_factor = cur.execute("SELECT * FROM generator_info").fetchone()
-        header = Label(tab, text="Daily Tc99m Generator Elution Log Sheet", fg="white", bg=C4,
-                       font=(FONT_NAME, 18, "bold"))
+        header = Label(tab, text="Daily Tc99m Generator Elution Log Sheet", fg="white", bg=C4, font=(FONT_NAME, 25, "bold"))
         header.pack(pady=(5, 0), fill="x")
         # Scrollable Canvas/Frame
         contents, canvas, scroll_frame, scrollbar = create_scrollable_frame(tab)
         # Selected Generator Info
         info_frame = Frame(scroll_frame, bg=C4)
         info_frame.pack(anchor="center", pady=20)
-        Label(info_frame, text=f"Generator ID: {gen_id}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=0, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Calibration on: {cal_date} {cal_time}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=1, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Mo Activity (mCi): {activity}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=2, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Start Date: {start_date}", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=3, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"T1/2 Mo99 (HR): {T12_MO99}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=0, column=1, padx=6, pady=6)
-        Label(info_frame, text=f"T1/2 Tc99m (HR): {T12_TC99M}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=1, column=1, padx=6, pady=6)
-        Label(info_frame, text=f"Expiration Date: {expiration_date}", **TEXT_COLORS, font=(FONT_NAME, 10)).grid(row=2, column=1, padx=6, pady=6)
+        Label(info_frame, text=f"Generator ID: {gen_id}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Calibration on: {cal_date} {cal_time}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Mo Activity (mCi): {activity}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=2, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Start Date: {start_date}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=3, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"T1/2 Mo99 (HR): {T12_MO99}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=1, padx=6, pady=6)
+        Label(info_frame, text=f"T1/2 Tc99m (HR): {T12_TC99M}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=1, padx=6, pady=6)
+        Label(info_frame, text=f"Expiration Date: {expiration_date}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=2, column=1, padx=6, pady=6)
         action_button = Button(info_frame, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                                width=14, height=1, font=(FONT_NAME, 10, "bold"))
+                                width=14, height=1, font=(FONT_NAME, 12, "bold"))
         action_button.grid(row=3, column=1, padx=6, pady=6)
         def configure_action_button():
             cur.execute("SELECT stored_date, disposal_date, expiration_date FROM generator_info ORDER BY rowid DESC LIMIT 1")
@@ -208,9 +206,9 @@ def build_tab(app, tab):
                 return
             action_button.config(state="disabled")
         # Elutions Table
-        columns = [("date", "Date", 120), ("time", "Time", 100), ("activity", "Activity(mCi)", 120),
-                   ("expected_activity", "Expected(mCi)", 120),
-                   ("div", "Div(%)", 100), ("volume", "Vol(ml)", 120), ("concentration", "Conc(mCi/ml)", 120)]
+        columns = [("date", "Date", 150), ("time", "Time", 150), ("activity", "Activity(mCi)", 180),
+                   ("expected_activity", "Expected(mCi)", 180),
+                   ("div", "Div(%)",150), ("volume", "Vol(ml)", 150), ("concentration", "Conc(mCi/ml)", 150)]
         tree = ttk.Treeview(scroll_frame, columns=[c[0] for c in columns], show="headings")
         tree.pack(pady=15)
         for col_id, col_title, col_width in columns:
@@ -218,8 +216,8 @@ def build_tab(app, tab):
             tree.column(col_id, width=col_width, anchor="center")
         style = ttk.Style()
         style.theme_use("default")
-        style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", rowheight=26, borderwidth=1, bordercolor="black", relief="solid")
-        style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 11, "bold"), relief="solid")
+        style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", font=(FONT_NAME,12), rowheight=26, borderwidth=1, bordercolor="black", relief="solid")
+        style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 14, "bold"), relief="solid")
         style.map("Treeview", background=[("selected", "#8FAADC"), ("!selected", C2)], foreground=[("selected", "black")])
         style.layout("Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
 
@@ -234,22 +232,22 @@ def build_tab(app, tab):
         # =====Add New Elution=====
         add_frame = Frame(scroll_frame, bg=C4)
         add_frame.pack(pady=10)
-        Label(add_frame, text="Date:", **TEXT_COLORS).grid(row=0, column=0)
+        Label(add_frame, text="Date:", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=0, column=0)
         elution_date_entry = DateEntry(add_frame, width=10, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         elution_date_entry.grid(row=0, column=1, padx=5)
         time_field = Frame(add_frame, bg="white", highlightbackground="black", highlightthickness=0)
         time_field.grid(row=0, column=3, padx=5)
-        Label(add_frame, text="Time of Elution:", **TEXT_COLORS).grid(row=0, column=2, sticky="e", padx=5)
+        Label(add_frame, text="Time of Elution:", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=0, column=2, sticky="e", padx=5)
         elution_time_entry = Entry(time_field, width=7, bd=0, font=(FONT_NAME, 10))
         elution_time_entry.pack(side="left", padx=(3, 0), pady=2)
         update_time(elution_time_entry)
         refresh_time_button = Button(time_field, text="↻", command=lambda nt=elution_time_entry: update_time(nt), bg="white",
                                      fg="black", bd=0, padx=3, pady=0, font=(FONT_NAME, 10), cursor="hand2")
         refresh_time_button.pack(side="right", padx=3)
-        Label(add_frame, text="Activity (mCi):", **TEXT_COLORS).grid(row=0, column=4, sticky="e", padx=5)
+        Label(add_frame, text="Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=0, column=4, sticky="e", padx=5)
         elution_activity_entry = Entry(add_frame, width=10)
         elution_activity_entry.grid(row=0, column=5, padx=5)
-        Label(add_frame, text="Volume (ml):", **TEXT_COLORS).grid(row=0, column=6, sticky="e", padx=5)
+        Label(add_frame, text="Volume (ml):", **TEXT_COLORS, font=(FONT_NAME,12)).grid(row=0, column=6, sticky="e", padx=5)
         elution_volume_entry = Entry(add_frame, width=8)
         elution_volume_entry.grid(row=0, column=7, padx=5)
 
@@ -374,7 +372,7 @@ def build_tab(app, tab):
                width=5, height=1, font=(FONT_NAME, 10, "bold")).grid(row=0, column=10, padx=6)
 
         # =====Kits=====
-        Label(scroll_frame, text="Select Radiopharmaceutical Kit:", **TEXT_COLORS, font=(FONT_NAME, 14, "bold")).pack(pady=(40, 20))
+        Label(scroll_frame, text="Select Radiopharmaceutical Kit:", **TEXT_COLORS, font=(FONT_NAME, 18, "bold")).pack(pady=(40, 20))
         kits_frame = Frame(scroll_frame, bg=C4)
         kits_frame.pack(pady=2)
 
@@ -536,12 +534,12 @@ def build_tab(app, tab):
             r = idx // 5
             c = idx % 5
             Button(kits_frame, text=text, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                   width=12, height=1, font=(FONT_NAME, 10, "bold"), command=lambda t=text: open_kit_popup(t, conn)).grid(column=c, row=r, padx=10, pady=10)
+                   width=14, height=1, font=(FONT_NAME, 12, "bold"), command=lambda t=text: open_kit_popup(t, conn)).grid(column=c, row=r, padx=10, pady=10)
 
         # Kit Table
         date_frame = Frame(scroll_frame, bg=C4)
         date_frame.pack(pady=20)
-        Label(date_frame, text="Select Date:", font=(FONT_NAME, 10, "bold"), **TEXT_COLORS).grid(column=0, row=0, padx=5)
+        Label(date_frame, text="Select Date:", font=(FONT_NAME, 12, "bold"), **TEXT_COLORS).grid(column=0, row=0, padx=5)
         select_date = DateEntry(date_frame, date_pattern="dd-mm-yyyy", width=12)
         select_date.grid(column=1, row=0, padx=5)
         Button(date_frame, text="Load", command=lambda: load_kits_by_date(select_date.get()), **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=6,
@@ -554,10 +552,10 @@ def build_tab(app, tab):
         kit_tree.kit_ids = {}
         kit_tree.column("#0", width=0, stretch=False)
         kit_tree.heading("#0", text="")
-        headers = [("time", "Time", 60), ('kit', "Kit", 60), ("volume", "Vol(ml)", 100),
-                   ("activity", "Activity(mCi)", 120), ("concentration", "Conc(mCi/ml)", 110),
-                   ("dose", "Dose(mCi)", 110), ("dose_volume", "Dose Vol(ml)", 110),
-                   ("volume_left", "Vol Left(ml)", 100)]
+        headers = [("time", "Time", 90), ('kit', "Kit", 90), ("volume", "Vol(ml)", 120),
+                   ("activity", "Activity(mCi)", 150), ("concentration", "Conc(mCi/ml)", 150),
+                   ("dose", "Dose(mCi)", 120), ("dose_volume", "Dose Vol(ml)", 150),
+                   ("volume_left", "Vol Left(ml)", 150)]
         for col, title, width in headers:
             kit_tree.heading(col, text=title)
             kit_tree.column(col, width=width, anchor="center")
@@ -567,10 +565,10 @@ def build_tab(app, tab):
             popup = Toplevel(tab)
             popup.title("Insert Actual Values")
             popup.config(bg=C4, pady=15)
-            center_window(popup, 250, 120)
+            center_window(popup, 280, 140)
             values = list(kit_tree.item(parent_id, "values"))
             planned_activity = values[3].split("→")[0].strip()
-            Label(popup, text="Actual Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=5, pady=10)
+            Label(popup, text="Actual Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=5, pady=10)
             actual_activity_entry = Entry(popup, width=10)
             actual_activity_entry.insert(0, f"{planned_activity}")
             actual_activity_entry.grid(row=0, column=1, padx=5, pady=10)
@@ -658,10 +656,10 @@ def build_tab(app, tab):
             popup = Toplevel(tab)
             popup.title("Insert Actual Values")
             popup.config(bg=C4, pady=15)
-            center_window(popup, 250, 120)
+            center_window(popup, 280, 140)
             values = list(kit_tree.item(child_id, "values"))
             planned_dose = values[5].split("→")[0].strip()
-            Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=5, pady=10)
+            Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=5, pady=10)
             actual_dose_entry = Entry(popup, width=10)
             actual_dose_entry.insert(0, f"{planned_dose}")
             actual_dose_entry.grid(row=0, column=1, padx=5, pady=10)
@@ -801,14 +799,14 @@ def build_tab(app, tab):
             popup = Toplevel()
             popup.title("Patient Data")
             popup.configure(bg=C4)
-            center_window(popup, 240, 160)
+            center_window(popup, 270, 180)
             frame = Frame(popup, bg=C4)
             frame.pack(expand=True, fill="both", anchor="center", padx=10, pady=10)
-            Label(frame, text="Patient Name: ", font=(FONT_NAME, 10), **TEXT_COLORS).grid(row=0, column=0, pady=5)
+            Label(frame, text="Patient Name: ", font=(FONT_NAME, 14), **TEXT_COLORS).grid(row=0, column=0, pady=5)
             name_entry = Entry(frame, width=18)
             name_entry.insert(0, "-")
             name_entry.grid(row=0, column=1, pady=5)
-            Label(frame, text="Time: ", font=(FONT_NAME, 10), **TEXT_COLORS).grid(row=1, column=0, pady=5)
+            Label(frame, text="Time: ", font=(FONT_NAME, 14), **TEXT_COLORS).grid(row=1, column=0, pady=5)
             time_frame = Frame(frame, bg="white", highlightbackground="black", highlightthickness=0)
             time_frame.grid(row=1, column=1, padx=5)
             time_entry = Entry(time_frame, width=6, bd=0, font=(FONT_NAME, 10))
@@ -817,7 +815,7 @@ def build_tab(app, tab):
             refresh_time_but =  Button(time_frame, text="↻", command=lambda nt=time_entry: update_time(nt), bg="white",
                                        fg="black", bd=0, padx=3, pady=0, font=(FONT_NAME,10), cursor="hand2")
             refresh_time_but.pack(side="right", padx=3)
-            Label(frame, text="Dose(mCi):", font=(FONT_NAME, 10), **TEXT_COLORS).grid(row=2, column=0, pady=5)
+            Label(frame, text="Dose(mCi):", font=(FONT_NAME, 14), **TEXT_COLORS).grid(row=2, column=0, pady=5)
             dose_entry = Entry(frame, width=10)
             dose_entry.grid(row=2, column=1, pady=5)
 
@@ -907,9 +905,9 @@ def build_tab(app, tab):
                 popup.destroy()
 
             Button(frame, text="Save", command=save_patient, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                   width=12, height=1).grid(row=4, column=0, pady=10, padx=5)
+                   width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=4, column=0, pady=10, padx=5)
             Button(frame, text="Cancel", command=popup.destroy, **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                   width=12, height=1).grid(row=4, column=1, pady=10, padx=5)
+                   width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=4, column=1, pady=10, padx=5)
 
         #Delete Parent(Kit) or Child(Patient)
         def delete_selected_kit_or_patient():

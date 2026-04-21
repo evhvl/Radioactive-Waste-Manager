@@ -8,8 +8,7 @@ from constants import *
 window = Tk()
 window.title("RadioWaste Manager")
 window.config(bg=BG)
-window.geometry("1050x650")
-functions.center_window(window, 1050, 650)
+functions.center_window(window, 1400, 800)
 
 # =====Create Main Frame=====
 main_frame = Frame(window, bg=BG, highlightthickness=0)
@@ -38,10 +37,10 @@ tabs_frame.grid(column=1, row=0, sticky="nsew", padx=10, pady=10)
 main_tab = Frame(tabs_frame, bg=BG)
 tabs_frame.add(main_tab, text="Main Menu")
 
-canvas = Canvas(main_tab, width=780, height=600, bg=BG, highlightthickness=0)
-test_img = PhotoImage(file="white_bg_radioactive.png")
-canvas.create_image(350,450, image=test_img)
-main_text = canvas.create_text(400,30,text="MAIN MENU", font=(FONT_NAME,32,"bold"), fill="white")
+canvas = Canvas(main_tab, width=1500, height=800, bg=BG, highlightthickness=0)
+test_img = PhotoImage(file="white_bg_radioactive.png").zoom(2,2)
+canvas.create_image(550,690, image=test_img)
+main_text = canvas.create_text(200,50,text="MAIN MENU", font=(FONT_NAME,32,"bold"), fill="white")
 canvas.pack()
 
 func = Tabs(window, tabs_frame, main_tab)
