@@ -743,9 +743,17 @@ def read_tc99m_items(batch_path=None):
     return rows
 
 #====SYNC TC99M GEN FOR DISPOSAL=====
-def sync_tc99m_gen_for_disposal(dbfile):
-    conn = sqlite3.connect(dbfile)
-    cur = conn.cursor()
+def ensure_elutions_disposal_columns(cur, conn):
+    cols = [r[1] for r in cur.execute("PRAGMA table_info(elutions)").fetchall()]
+    if "stored_to_disposal" not in cols:
+        cur.execute("ALTER TABLE elutions ADD COLUMN stored_to_disposal INTEGER DEFAULT 0")
+    if "stored_to_disposal_at" not in cols:
+        cur.execute("ALTER TABLE elutions ADD COLUMN stored_to_disposal_at TEXT")
+    if "disposal_item_id" not in cols:
+        cur.execute("ALTER TABLE elutions ADD COLUMN disposal_item_id TEXT")
+    conn.commit()
+
+def ensure_kits_disposal_columns(cur, conn):
     cols = [r[1] for r in cur.execute("PRAGMA table_info(kits)").fetchall()]
     if "stored_to_disposal" not in cols:
         cur.execute("ALTER TABLE kits ADD COLUMN stored_to_disposal INTEGER DEFAULT 0")
@@ -754,6 +762,59 @@ def sync_tc99m_gen_for_disposal(dbfile):
     if "disposal_item_id" not in cols:
         cur.execute("ALTER TABLE kits ADD COLUMN disposal_item_id TEXT")
     conn.commit()
+
+def sync_tc99m_elutions_for_disposal(dbfile):
+    conn = sqlite3.connect(dbfile)
+    cur = conn.cursor()
+    ensure_elutions_disposal_columns(cur, conn)
+    today = datetime.now().date()
+    elution_rows = cur.execute("SELECT id, date, time, volume, concentration "
+                               "FROM elutions "
+                               "WHERE COALESCE(stored_to_disposal, 0) = 0 "
+                               "ORDER BY date, time").fetchall()
+    synced_count = 0
+    for elution_id, date_str, time_str, volume, concentration in elution_rows:
+        try:
+            elution_date = datetime.strptime(date_str, DATE_FORMAT).date()
+        except ValueError:
+            continue
+        if elution_date >= today:
+            continue
+        volume = float(volume or 0)
+        concentration = float(concentration or 0)
+        used_volume_row = cur.execute("SELECT COALESCE(SUM(volume), 0) "
+                                      "FROM kits "
+                                      "WHERE parent_id IS NULL AND date = ? AND elution = ?",
+                                      (date_str, time_str)).fetchone()
+        used_volume = float(used_volume_row[0] or 0)
+        remaining_volume = round(volume - used_volume, 2)
+        if remaining_volume < 0:
+            remaining_volume = 0.0
+        remaining_activity = round(remaining_volume * concentration, 2)
+        stored_at = date_str
+        item_id = f"Elution-{time_str}"
+        item_label = f"Elution-{time_str}"
+        if remaining_activity > 0:
+            recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE, activity_mci=remaining_activity, stored_at=stored_at)
+            store_tc99m_item(item_id=item_id,
+                             source_parent_id=f"ELUTION-{elution_id}",
+                             item_label=item_label,
+                             kit_name="ELUTION",
+                             stored_at=stored_at,
+                             activity_mci=remaining_activity,
+                             permitted_date=permitted_date,
+                             recommended_date=recommended_date)
+        cur.execute("UPDATE elutions SET stored_to_disposal = 1, stored_to_disposal_at = ?, disposal_item_id = ? WHERE id = ?",
+                    (datetime.now().strftime(DATE_FORMAT), item_id, elution_id))
+        synced_count += 1
+    conn.commit()
+    conn.close()
+    return synced_count
+
+def sync_tc99m_kits_for_disposal(dbfile):
+    conn = sqlite3.connect(dbfile)
+    cur = conn.cursor()
+    ensure_kits_disposal_columns(cur, conn)
     today = datetime.now().date()
     rows = cur.execute("SELECT id, date, time, kit, concentration, volume_left "
                        "FROM kits "
@@ -792,3 +853,9 @@ def sync_tc99m_gen_for_disposal(dbfile):
     conn.commit()
     conn.close()
     return synced_count
+
+def sync_tc99m_gen_for_disposal(dbfile):
+    kits_count = sync_tc99m_kits_for_disposal(dbfile)
+    elutions_count = sync_tc99m_elutions_for_disposal(dbfile)
+    return kits_count, elutions_count
+

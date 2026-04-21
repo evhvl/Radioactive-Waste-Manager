@@ -303,18 +303,18 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
         for r in rows:
             iid, item_label, stored_at, activity_mci, permitted, recommended = r
             status = disposal_status(recommended, permitted)
-            tree.insert("", "end", iid=iid, values=[item_label, stored_at, float(activity_mci), permitted, recommended, status], tags=(status,))
+            tree.insert("", "end", iid=str(iid), values=[item_label, stored_at, float(activity_mci), permitted, recommended, status], tags=(status,))
             summary_rows.append((iid, TC99M_NUCLIDE, None, stored_at, float(activity_mci), permitted, recommended, None))
-            total_items, total_activity, ready_count = disposal_summary(summary_rows)
-            summary_label.config(text=f"Total vials: {total_items}   |   Total activity ATM: {total_activity} mCi   |   READY: {ready_count}")
-            created_at, finalized_at, disposed_at = read_batch_info(batch_path)
-            if not read_only:
-                action_btn.config(text="✗Finalize Batch✗", command=finalize_batch, state="normal")
-                return
-            if finalized_at is not None and disposed_at is None:
-                action_btn.config(text="✗Dispose Batch✗", command=dispose_current_batch, state="normal")
-            else:
-                action_btn.config(text="✗Dispose Batch✗", command=lambda: None, state="disabled")
+        total_items, total_activity, ready_count = disposal_summary(summary_rows)
+        summary_label.config(text=f"Total vials: {total_items}   |   Total activity ATM: {total_activity} mCi   |   READY: {ready_count}")
+        created_at, finalized_at, disposed_at = read_batch_info(batch_path)
+        if not read_only:
+            action_btn.config(text="✗Finalize Batch✗", command=finalize_batch, state="normal")
+            return
+        if finalized_at is not None and disposed_at is None:
+            action_btn.config(text="✗Dispose Batch✗", command=dispose_current_batch, state="normal")
+        else:
+            action_btn.config(text="✗Dispose Batch✗", command=lambda: None, state="disabled")
     def refresh():
         if not state["batch_path"]:
             load_active()
@@ -345,7 +345,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
     action_btn.grid(row=0, column=3, padx=6)
     #Tree
     columns = [("Item", 100), ("Stored at", 120), ("Activity (mCi)", 140), ("Permitted Date", 150), ("Recommended Date", 180), ("Status", 90),]
-    tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=14)
+    tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=15)
     tree.pack(pady=(10,0))
     for col_name, col_width in columns:
         tree.heading(col_name, text=col_name)
@@ -360,7 +360,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
     tree.tag_configure("WAIT", background="#FFE9B3")
     tree.tag_configure("READY", background="#F6B3B3")
     summary_frame = Frame(parent_tab, bg=C4)
-    summary_frame.pack(pady=(5,10))
+    summary_frame.pack(pady=(15,15))
     summary_label = Label(summary_frame, text="", **TEXT_COLORS, font=(FONT_NAME, 14, "bold"))
     summary_label.pack()
     if on_back:
