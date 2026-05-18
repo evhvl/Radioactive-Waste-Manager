@@ -57,7 +57,7 @@ def build_tab(app, tab):
         Label(info_frame, text="Mo99 Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=3, column=0, sticky="e", padx=5, pady=5)
         activity_entry = Entry(info_frame, width=18)
         activity_entry.grid(row=3, column=1, pady=5)
-        Label(info_frame, text="Start Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=4, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Delivery Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=4, column=0, sticky="e", padx=5, pady=5)
         start_date_entry = DateEntry(info_frame, width=16, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
         start_date_entry.grid(row=4, column=1, pady=5)
         Label(info_frame, text="Expiration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=5, column=0, sticky="e", padx=5, pady=5)
@@ -69,7 +69,7 @@ def build_tab(app, tab):
                       "Calibration Date": cal_date_entry,
                       "Calibration Time": cal_time_entry,
                       "Mo Activity (mCi)": activity_entry,
-                      "Start Date": start_date_entry,
+                      "Delivery Date": start_date_entry,
                       "Expiration Date": expiration_date_entry}
             values = {}
             for name, entry in fields.items():
@@ -101,7 +101,7 @@ def build_tab(app, tab):
             db_path = os.path.join(gen_dir, f"{folder_name}.sqlite")
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
-            cur.execute("""CREATE TABLE IF NOT EXISTS generator_info(id TEXT PRIMARY KEY, cal_date TEXT, cal_time TEXT, mo_activity REAL, start_date TEXT, expiration_date TEXT, stored_date TEXT, disposal_date TEXT, cal_factor REAL)""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS generator_info(id TEXT PRIMARY KEY, cal_date TEXT, cal_time TEXT, mo_activity REAL, delivery_date TEXT, expiration_date TEXT, stored_date TEXT, disposal_date TEXT, cal_factor REAL)""")
             cur.execute("""CREATE TABLE IF NOT EXISTS elutions(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, time TEXT, tc_activity REAL, expected_activity REAL, 
                                                                div REAL, volume REAL, concentration REAL, mo_activity REAL)""")
             cur.execute("""CREATE TABLE IF NOT EXISTS kits(id TEXT PRIMARY KEY, parent_id TEXT, date TEXT, time TEXT, kit TEXT, volume REAL, activity REAL,
@@ -178,7 +178,7 @@ def build_tab(app, tab):
         Label(info_frame, text=f"Generator ID: {gen_id}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=0, padx=6, pady=6)
         Label(info_frame, text=f"Calibration on: {cal_date} {cal_time}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=6, pady=6)
         Label(info_frame, text=f"Mo Activity (mCi): {activity}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=2, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Start Date: {start_date}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=3, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Delivery Date: {start_date}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=3, column=0, padx=6, pady=6)
         Label(info_frame, text=f"T1/2 Mo99 (HR): {T12_MO99}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=1, padx=6, pady=6)
         Label(info_frame, text=f"T1/2 Tc99m (HR): {T12_TC99M}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=1, padx=6, pady=6)
         Label(info_frame, text=f"Expiration Date: {expiration_date}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=2, column=1, padx=6, pady=6)
@@ -419,7 +419,7 @@ def build_tab(app, tab):
             dropdown.config(bg="white", fg="black", width=4, height=1, highlightthickness=0)
             dropdown.grid(row=row, column=1, sticky="w", padx=(5, 20), pady=(15, 5))
             row += 1
-            Label(container, text="Segmentation Time:", **TEXT_COLORS_KITS, font=(FONT_NAME, 12, "bold")).grid(row=row, column=0, padx=8, pady=10, sticky="e")
+            Label(container, text="Labeling Time:", **TEXT_COLORS_KITS, font=(FONT_NAME, 12, "bold")).grid(row=row, column=0, padx=8, pady=10, sticky="e")
             t_field = Frame(container, bg="white", highlightbackground="black", highlightthickness=0)
             t_field.grid(row=row, column=1, padx=5, sticky="w")
             time_entry = Entry(t_field, width=5, bd=0, font=(FONT_NAME, 8))

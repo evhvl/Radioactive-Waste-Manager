@@ -64,6 +64,8 @@ DAILY_LOG_DB = os.path.join(DAILY_DISPOSALS_DIR, "daily_disposals.sqlite")
 TC99M_NUCLIDE = "Tc99m"
 DISPOSAL_LIMITS_BQ = {"51-Cr": 1e7, "59-Fe": 1e6, "67-Ga": None, "89-Sr": 1e6, "90-Y":  1e5, "111-In": 1e6, "123-I": 1e7,
                       "125-I": 1e6, "131-I": 1e6, "153-Sm": 1e6, "186-Re": 1e6, "201-Tl": 1e6, "Tc99m": 1e7}
+DISPOSAL_LIMITS_KBQ_PER_KG = {"51-Cr": 100, "59-Fe": 1, "67-Ga": None, "89-Sr": 1000, "90-Y":  1000, "111-In": 10, "123-I": 100,
+                              "125-I": 100, "131-I": 10, "153-Sm": 100, "186-Re": 1000, "201-Tl": 100, "Tc99m": 100}
 
 #=====Kits=====
 KIT_CONFIG = {

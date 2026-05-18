@@ -69,7 +69,7 @@ def build_tab(app, tab):
                       "Calibration Date": cal_date_entry,
                       "Calibration Time": cal_time_entry,
                       "Activity (MBq)": activity_entry,
-                      "Start Date": start_date_entry,
+                      "Delivery Date": start_date_entry,
                       "Expiration Date": expiration_date_entry}
             values = {}
             for name, entry in fields.items():
@@ -101,7 +101,7 @@ def build_tab(app, tab):
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
             cur.execute(
-                """CREATE TABLE IF NOT EXISTS generator_info(id TEXT PRIMARY KEY, model TEXT, start_date TEXT, cal_date TEXT, cal_time TEXT, activity REAL, expiration_date TEXT, disposal_date TEXT)""")
+                """CREATE TABLE IF NOT EXISTS generator_info(id TEXT PRIMARY KEY, model TEXT, delivery_date TEXT, cal_date TEXT, cal_time TEXT, activity REAL, expiration_date TEXT, disposal_date TEXT)""")
             cur.execute(
                 """CREATE TABLE IF NOT EXISTS elutions(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, time TEXT, activity REAL)""")
             cur.execute(
@@ -178,7 +178,7 @@ def build_tab(app, tab):
         Label(info_frame, text=f"Generator ID: {gen_id}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=0, padx=6, pady=6)
         Label(info_frame, text=f"Calibration on: {cal_date} {cal_time}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=6, pady=6)
         Label(info_frame, text=f"Activity (MBq): {activity}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=2, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Start Date: {start_date}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=3, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Delivery Date: {start_date}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=3, column=0, padx=6, pady=6)
         Label(info_frame, text=f"T1/2 Ge68 (D): {T12_GE68}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=1, padx=6, pady=6)
         Label(info_frame, text=f"T1/2 Ga68 (MIN): {T12_GA68}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=1, padx=6, pady=6)
         Label(info_frame, text=f"Expiration Date: {expiration_date}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=2, column=1, padx=6, pady=6)

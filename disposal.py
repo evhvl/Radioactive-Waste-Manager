@@ -1,4 +1,4 @@
-from tkinter import Label, filedialog, ttk, Toplevel
+from tkinter import Label, filedialog, ttk, Toplevel, simpledialog
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -52,7 +52,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
                         recommended if recommended is not None else "", "" if limit_mci is None else float(limit_mci), status], tags=(status,))
             summary_rows.append((rid, radionuclide, stored_at, activity0, permitted, recommended, limit_mci))
         total_vials, total_activity, ready_count = disposal_summary(rows)
-        summary_label.config(text=f"Total vials: {total_vials}   |   Total activity ATM: {total_activity} mCi   |   READY: {ready_count}")
+        summary_label.config(text=f"Total vials: {total_vials}   |   Total activity Now: {total_activity} mCi   |   READY: {ready_count}")
     def refresh():
         load_live_storage()
     def dispose_selected_vials():
@@ -104,56 +104,113 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
         if not ready_items:
             messagebox.showinfo("Check READY", "No READY vials found today.")
             return
-        groups = {}
-        for it in ready_items:
-            nucl = it["radionuclide"]
-            g = groups.setdefault(nucl, {"radionuclide": nucl,
-                                         "limit_mci": it["limit_mci"],
-                                         "total_now": 0.0,
-                                         "items": []})
-            g["total_now"] += it["activity_now"]
-            g["items"].append(it)
-        for g in groups.values():
-            g["total_now"] = round(g["total_now"], 2)
-            g["items"].sort(key=lambda x: (str(x["cal_date"]), x["id"]))
-        eligible = {}
-        for nucl, g in groups.items():
-            lim = g["limit_mci"]
-            if lim is None:
-                eligible[nucl] = g
-            else:
-                if g["total_now"] <= float(lim):
-                    eligible[nucl] = g
-        if not eligible:
-            messagebox.showinfo("Check READY", "READY vials exist today, but none are eligible to dispose (limit exceeded).")
+        mass_kg = simpledialog.askfloat("Bag Mass", "Enter total bag mass in kg:", parent=parent_tab, minvalue=0.0001)
+        if mass_kg is None:
             return
-        lines = ["Eligible radionuclides (can be disposed today):"]
+        try:
+            clearance_details, total_fraction, is_clearable = calc_bag_clearance(ready_items, mass_kg)
+        except Exception as e:
+            messagebox.showerror("Clearance Calculation Error", str(e))
+            return
+        if not is_clearable:
+            lines = [
+                "READY vials exist, but this bag cannot be disposed together.",
+                "",
+                f"Bag mass: {float(mass_kg):.3f} kg",
+                f"Σ fractions: {total_fraction:.4f}  (must be < 1)",
+                "",
+                "Breakdown:"
+            ]
+            for d in clearance_details:
+                lines.append(
+                    f"- {d['radionuclide']}: "
+                    f"C={d['concentration_kbq_kg']:.4f} kBq/kg, "
+                    f"Limit={d['limit_kbq_kg']:.4f} kBq/kg, "
+                    f"Fraction={d['fraction']:.4f}, "
+                    f"vials={d['count']}"
+                )
+            messagebox.showwarning("Not clearable", "\n".join(lines))
+            return
+        eligible = {}
+        for d in clearance_details:
+            nucl = d["radionuclide"]
+            eligible[nucl] = {
+                "radionuclide": nucl,
+                "limit_mci": None,
+                "limit_kbq_kg": d["limit_kbq_kg"],
+                "concentration_kbq_kg": d["concentration_kbq_kg"],
+                "fraction": d["fraction"],
+                "total_now": round(d["activity_now_mci"], 2),
+                "items": d["items"],
+            }
+            eligible[nucl]["items"].sort(key=lambda x: (str(x["cal_date"]), x["id"]))
+        lines = [
+            "Eligible READY vials can be disposed together.",
+            "",
+            f"Bag mass: {float(mass_kg):.3f} kg",
+            f"Σ fractions: {total_fraction:.4f}  (< 1)",
+            "",
+            "Breakdown:"
+        ]
         for nucl, g in sorted(eligible.items(), key=lambda kv: kv[0]):
-            lim_txt = "-" if g["limit_mci"] is None else f"{g['limit_mci']:.2f}"
-            lines.append(f"- {nucl}: {g['total_now']:.2f} mCi (limit {lim_txt}) | vials: {len(g['items'])}")
-        messagebox.showinfo("Check READY", "\n".join(lines))
+            lines.append(
+                f"- {nucl}: {g['total_now']:.2f} mCi | "
+                f"C={g['concentration_kbq_kg']:.4f} kBq/kg | "
+                f"Limit={g['limit_kbq_kg']:.4f} kBq/kg | "
+                f"Fraction={g['fraction']:.4f} | "
+                f"vials={len(g['items'])}"
+            )
+        messagebox.showinfo("Clearance passed", "\n".join(lines))
         popup = Toplevel(parent_tab)
-        popup.title("Eligible READY Vials (by radionuclide)")
-        Label(popup, text="Select radionuclides to dispose", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=(10, 10))
-        cols = ("Radionuclide", "Total A ATM(mCi)", "Limit(mCi)", "Count")
+        popup.title("Eligible READY Vials (Table A clearance passed)")
+        Label(popup, text="Select radionuclides to dispose", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(
+            pady=(10, 10))
+        clearance_label = Label(popup,
+                                text=f"Bag mass: {float(mass_kg):.3f} kg   |   Σ fractions: {total_fraction:.4f}   |   Required: < 1",
+                                **TEXT_COLORS,
+                                font=(FONT_NAME, 13, "bold"))
+        clearance_label.pack(pady=(0, 10))
+        cols = ("Radionuclide", "Total A Now(mCi)", "C(kBq/kg)", "Limit(kBq/kg)", "Fraction", "Count")
         t_groups = ttk.Treeview(popup, columns=cols, show="headings", height=6, selectmode="extended")
-        for c in cols:
+        widths = [150, 170, 140, 150, 110, 80]
+        for c, w in zip(cols, widths):
             t_groups.heading(c, text=c)
-            t_groups.column(c, anchor="center", width=160, stretch=False)
-        t_groups.column("Radionuclide", width=160)
-        t_groups.column("Total A ATM(mCi)", width=180)
-        t_groups.column("Count", width=90)
+            t_groups.column(c, anchor="center", width=w, stretch=False)
         t_groups.pack(pady=(0, 10))
         det_cols = ("ID", "Nuclide", "Cal Date", "Stored at", "A0(mCi)", "A Now(mCi)", "Permitted")
         t_det = ttk.Treeview(popup, columns=det_cols, show="headings", height=10)
-        widths = [80, 90, 105, 105, 100, 110, 105]
-        for c, w in zip(det_cols, widths):
+        det_widths = [80, 90, 105, 105, 100, 110, 105]
+        for c, w in zip(det_cols, det_widths):
             t_det.heading(c, text=c)
             t_det.column(c, anchor="center", width=w, stretch=False)
         t_det.pack(pady=(0, 12))
         for nucl, g in sorted(eligible.items(), key=lambda kv: kv[0]):
-            lim_txt = "-" if g["limit_mci"] is None else f"{g['limit_mci']:.2f}"
-            t_groups.insert("", "end", iid=nucl, values=(nucl, f"{g['total_now']:.2f}", lim_txt, str(len(g["items"]))))
+            t_groups.insert("", "end", iid=nucl,
+                            values=(nucl,
+                                    f"{g['total_now']:.2f}",
+                                    f"{g['concentration_kbq_kg']:.4f}",
+                                    f"{g['limit_kbq_kg']:.4f}",
+                                    f"{g['fraction']:.4f}",
+                                    str(len(g["items"]))))
+
+        def refresh_details(_evt=None):
+            t_det.delete(*t_det.get_children())
+            sel = t_groups.selection()
+            if not sel:
+                return
+            for nucl in sel:
+                g = eligible.get(nucl)
+                if not g:
+                    continue
+                for it in g["items"]:
+                    t_det.insert("", "end", values=(
+                        it["id"], it["radionuclide"], it["cal_date"], it["stored_at"],
+                        f"{it['activity0']:.2f}", f"{it['activity_now']:.2f}", it["permitted"]
+                    ))
+
+        t_groups.bind("<<TreeviewSelect>>", refresh_details)
+        t_groups.selection_set(t_groups.get_children())
+        refresh_details()
         def refresh_details(_evt=None):
             t_det.delete(*t_det.get_children())
             sel = t_groups.selection()
@@ -187,7 +244,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
                     if not g:
                         continue
                     lim_txt = "-" if g["limit_mci"] is None else f"{g['limit_mci']:.2f} mCi"
-                    story.append(Paragraph(f"{nucl} | Total Activity ATM (mCi): {g['total_now']:.2f} mCi | Limit: {lim_txt} | Count: {len(g['items'])}",
+                    story.append(Paragraph(f"{nucl} | Total Activity Now (mCi): {g['total_now']:.2f} mCi | Limit: {lim_txt} | Count: {len(g['items'])}",
                                             styles["Heading2"]))
                     story.append(Spacer(1, 6))
                     data = [["Cal Date", "Stored at", "A0 (mCi)", "Activity Now (mCi)", "Permitted"]]
@@ -306,7 +363,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
             tree.insert("", "end", iid=str(iid), values=[item_label, stored_at, float(activity_mci), permitted, recommended, status], tags=(status,))
             summary_rows.append((iid, TC99M_NUCLIDE, None, stored_at, float(activity_mci), permitted, recommended, None))
         total_items, total_activity, ready_count = disposal_summary(summary_rows)
-        summary_label.config(text=f"Total vials: {total_items}   |   Total activity ATM: {total_activity} mCi   |   READY: {ready_count}")
+        summary_label.config(text=f"Total vials: {total_items}   |   Total activity Now: {total_activity} mCi   |   READY: {ready_count}")
         created_at, finalized_at, disposed_at = read_batch_info(batch_path)
         if not read_only:
             action_btn.config(text="✗Finalize Batch✗", command=finalize_batch, state="normal")
@@ -344,7 +401,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
     action_btn = Button(btns, text="✗Finalize Batch✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=16, height=1, font=(FONT_NAME, 12, "bold"), command=finalize_batch)
     action_btn.grid(row=0, column=3, padx=6)
     #Tree
-    columns = [("Item", 100), ("Stored at", 120), ("Activity (mCi)", 140), ("Permitted Date", 150), ("Recommended Date", 180), ("Status", 90),]
+    columns = [("Item", 120), ("Stored at", 120), ("Activity (mCi)", 140), ("Permitted Date", 150), ("Recommended Date", 180), ("Status", 90),]
     tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=15)
     tree.pack(pady=(10,0))
     for col_name, col_width in columns:

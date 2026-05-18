@@ -62,7 +62,7 @@ def create_excel_for_tc99m(excel_path):
         wb = Workbook()
         ws = wb.active
         ws.title = "Gen Info"
-        ws.append(["Gen ID", "Calibration Date", "Calibration Time", "Mo99 Activity (mCi)", "Start Date", "Expiration Date", "Stored Date", "Disposal Date"])
+        ws.append(["Gen ID", "Calibration Date", "Calibration Time", "Mo99 Activity (mCi)", "Delivery Date", "Expiration Date", "Stored Date", "Disposal Date"])
         ws2 = wb.create_sheet("Elutions")
         ws2.append(["", "Date", "Time", "Activity(mCi)", "Expected(mCi)", "Div(%)", "Vol(ml)", "Conc(mCi/ml)"])
         ws3 = wb.create_sheet("Kits")
@@ -75,7 +75,7 @@ def create_excel_for_ga68(excel_path):
         wb = Workbook()
         ws = wb.active
         ws.title = "Gen Info"
-        ws.append(["Gen ID", "Model", "Start Date", "Calibration Date", "Calibration Time", "Activity (MBq)", "Expiration Date", "Disposal Date"])
+        ws.append(["Gen ID", "Model", "Delivery Date", "Calibration Date", "Calibration Time", "Activity (MBq)", "Expiration Date", "Disposal Date"])
         ws2 = wb.create_sheet("Elutions")
         ws2.append(["", "Date", "Time", "Activity(mCi)"])
         ws3 = wb.create_sheet("DOTATOC")
@@ -245,20 +245,20 @@ def disable_buttons(parent, exempt_texts=None):
 
 #Update Headers and Disable Buttons after Stored or Expired
 def update_header_and_disable(cur, header, tab, is_stored=False, is_disposed=False, is_expired=False):
-    if is_disposed and not is_stored and not is_expired:
+    if is_disposed and not is_stored:
         cur.execute("SELECT disposal_date FROM generator_info ORDER BY rowid DESC LIMIT 1")
         row = cur.fetchone()
         disposal_date = row[0] if row and row[0] else ""
-        header.config(text=f"⚠ GENERATOR DISPOSED ({disposal_date}) – NO FURTHER ACTIONS ALLOWED", fg="#660000", highlightthickness=1)
+        header.config(text=f"⚠ GENERATOR DISPOSED ({disposal_date}) – NO FURTHER ACTIONS ALLOWED", fg="#660000", highlightthickness=0, font=(FONT_NAME,23,"bold"))
         disable_buttons(tab, exempt_texts=["Back", "Load"])
-    elif is_stored and not is_disposed and not is_expired:
+    elif is_stored and not is_disposed:
         cur.execute("SELECT stored_date FROM generator_info ORDER BY rowid DESC LIMIT 1")
         row = cur.fetchone()
         stored_date = row[0] if row and row[0] else ""
-        header.config(text=f"⚠ GENERATOR STORED ({stored_date}) – NO FURTHER ACTIONS ALLOWED", fg="#CC0000", highlightthickness=1)
+        header.config(text=f"⚠ GENERATOR STORED ({stored_date}) – NO FURTHER ACTIONS ALLOWED", fg="#CC0000", highlightthickness=0, font=(FONT_NAME,23,"bold"))
         disable_buttons(tab, exempt_texts=["Back", "Load", "✗Dispose Gen✗"])
     elif is_expired and not is_disposed and not is_stored:
-        header.config(text="⚠ GENERATOR EXPIRED – NO FURTHER ACTIONS ALLOWED", fg="#FF8000", highlightthickness=1)
+        header.config(text="⚠ GENERATOR EXPIRED – NO FURTHER ACTIONS ALLOWED", fg="#FF8000", highlightthickness=0, font=(FONT_NAME,23,"bold"))
         disable_buttons(tab, exempt_texts=["Back", "Load", "✗Store Gen✗"])
 
 def ensure_dir(path):
@@ -270,6 +270,24 @@ def bq_to_mci(bq):
 
 def mci_to_bq(mci):
     return float(mci) * 3.7e7
+
+def mci_to_kbq(mci):
+    return float(mci) * 37000.0
+
+def kbq_to_mci(kbq):
+    return float(kbq) / 37000.0
+
+def activity_conc_kbq_per_kg(activity_mci, mass_kg):
+    mass_kg = float(mass_kg)
+    if mass_kg <= 0:
+        return messagebox.showerror("Error", "Mass cannot be <= 0.")
+    return mci_to_kbq(activity_mci) / mass_kg
+
+def disposal_fraction(activity_mci, mass_kg, limit_kbq_kg):
+    conc = activity_conc_kbq_per_kg(activity_mci, mass_kg)
+    if conc is None or limit_kbq_kg in (None, 0):
+        return messagebox.showerror("Error", "")
+    return conc / float(limit_kbq_kg)
 
 def decay_activity(activity_mci, half_life_hours, delta_hours):
     lambda_ = math.log(2) / half_life_hours
@@ -290,20 +308,13 @@ def activity_now(radionuclide, stored_at_str, activity0):
 def calc_date_below_limit(activity_mci, half_life_hours, limit_bq, start_date):
     activity_mci = float(activity_mci)
     half_life_hours = float(half_life_hours)
-    if half_life_hours <= 0:
+    if half_life_hours <= 0 or limit_bq in (None,0,""):
         return start_date.strftime(DATE_FORMAT)
-    if limit_bq is None:
-        return start_date.strftime(DATE_FORMAT)
-    limit_mci = round(float(limit_bq) / 3.7e7, 2)
-    if limit_mci <= 0:
-        return start_date.strftime(DATE_FORMAT)
-    if float(activity_mci) <= limit_mci:
+    limit_mci = float(limit_bq) / 3.7e7
+    if limit_mci <= 0 or activity_mci <= limit_mci:
         return start_date.strftime(DATE_FORMAT)
     lambda_ = math.log(2) / half_life_hours
-    ratio = activity_mci / limit_mci
-    if ratio <= 1:
-        return start_date.strftime(DATE_FORMAT)
-    t_hours = math.log(ratio) / lambda_
+    t_hours = math.log(activity_mci / limit_mci) / lambda_
     return (start_date + timedelta(hours=t_hours)).strftime(DATE_FORMAT)
 
 def calc_recommended_and_permitted_date(radionuclide, activity_mci, stored_at, safety_factor=0.1):
@@ -321,6 +332,41 @@ def calc_recommended_and_permitted_date(radionuclide, activity_mci, stored_at, s
     recommended = calc_date_below_limit(activity_mci, half_life, limit_bq * safety_factor, start_date)
     return recommended, permitted, float(limit_bq)
 
+def calc_bag_clearance(ready_items, mass_kg):
+    mass_kg = float(mass_kg)
+    if mass_kg <= 0:
+        return messagebox.showerror("Error", "Bag Mass must be greater than 0.")
+    grouped = {}
+    for it in ready_items:
+        nuclide = it["radionuclide"]
+        grouped.setdefault(nuclide, {"activity_now_mci": 0.0, "items": []})
+        grouped[nuclide]["activity_now_mci"] += float(it["activity_now"])
+        grouped[nuclide]["items"].append(it)
+    details = []
+    total_fraction = 0.0
+    missing_limits = []
+    for nuclide, g in sorted(grouped.items(), key=lambda kv: kv[0]):
+        limit_kbq_kg = DISPOSAL_LIMITS_KBQ_PER_KG[nuclide]
+        if limit_kbq_kg in (None,0,""):
+            missing_limits.append(nuclide)
+            continue
+        total_activity_mci = float(g["activity_now_mci"])
+        total_activity_kbq = mci_to_kbq(total_activity_mci)
+        concentration = total_activity_kbq / mass_kg
+        fraction = concentration / float(limit_kbq_kg)
+        total_fraction += fraction
+        details.append({"radionuclide": nuclide,
+                        "activity_now_mci": total_activity_mci,
+                        "activity_now_kbq": total_activity_kbq,
+                        "mass_kg": mass_kg,
+                        "concentration_kbq_kg": concentration,
+                        "limit_kbq_kg": float(limit_kbq_kg),
+                        "fraction": fraction,
+                        "count": len(g["items"]),})
+    if missing_limits:
+        messagebox.showwarning("Missing Table A kBq/kg limits for " + ", ".join(missing_limits))
+    return details, total_fraction, total_fraction < 1.0
+
 #=====TREE STATUS=====
 def disposal_status(recommended_date, permitted_date):
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -328,7 +374,7 @@ def disposal_status(recommended_date, permitted_date):
     perm = datetime.strptime(permitted_date, DATE_FORMAT)
     if today < perm:
         return "STORED"
-    elif perm < today < rec:
+    elif perm <= today < rec:
         return "WAIT"
     return "READY"
 
@@ -833,7 +879,7 @@ def sync_tc99m_kits_for_disposal(dbfile):
         volume_left = float(volume_left or 0)
         residual_activity = round(concentration * volume_left, 2)
         stored_at = kit_date_str
-        item_id = f"{datetime.strptime(kit_date_str, DATE_FORMAT).strftime('%Y%m%d')}-{kit_name}-{parent_id}"
+        item_id = f"{kit_name}"
         item_label = f"{kit_name}"
         if residual_activity > 0:
             recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE,
