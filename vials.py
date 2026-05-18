@@ -420,18 +420,22 @@ def build_tab(app, tab, vial_name):
                     excel_path = os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
                     wb = load_workbook(excel_path)
                     ws = wb["Administrations"]
-                    for row in ws.iter_rows(min_row=2):
-                        if str(row[0].value) == str(row_id):
-                            row[5].value = dose_actual
-                            row[6].value = volume_actual
-                            break
+                    updated_rows = cur.execute("SELECT id, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
+                    excel_row_map = {str(row[0].value): row[0].row for row in ws.iter_rows(min_row=2) if row[0].value is not None}
+                    for rid, dose_a, vol_a, vol_left in updated_rows:
+                        key = str(rid)
+                        if key in excel_row_map:
+                            excel_row = excel_row_map[key]
+                            if str(rid) == str(row_id):
+                                ws.cell(row=excel_row, column=6, value=dose_a)
+                                ws.cell(row=excel_row, column=7, value=vol_a)
+                            ws.cell(row=excel_row, column=8, value=vol_left)
                     wb.save(excel_path)
                     tree.delete(*tree.get_children())
-                    rows = cur.execute(
-                        "SELECT id, cal_date, cal_time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
+                    rows = cur.execute("SELECT id, cal_date, cal_time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
                     for r in rows:
                         rid = r[0]
-                        (date_v, time_v, patient, conc_v, dose_p, vol_p, dose_a, vol_a, vol_left) = r[1:]
+                        date_v, time_v, patient, conc_v, dose_p, vol_p, dose_a, vol_a, vol_left = r[1:]
                         dose_txt = f"{dose_a:.2f}" if dose_a is not None else f"{dose_p}"
                         vol_txt = f"{vol_a:.2f}" if vol_a is not None else f"{vol_p}"
                         tree.insert("", "end", iid=rid,

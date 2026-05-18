@@ -245,7 +245,7 @@ def disable_buttons(parent, exempt_texts=None):
 
 #Update Headers and Disable Buttons after Stored or Expired
 def update_header_and_disable(cur, header, tab, is_stored=False, is_disposed=False, is_expired=False):
-    if is_disposed and not is_stored:
+    if is_disposed:
         cur.execute("SELECT disposal_date FROM generator_info ORDER BY rowid DESC LIMIT 1")
         row = cur.fetchone()
         disposal_date = row[0] if row and row[0] else ""
@@ -362,9 +362,10 @@ def calc_bag_clearance(ready_items, mass_kg):
                         "concentration_kbq_kg": concentration,
                         "limit_kbq_kg": float(limit_kbq_kg),
                         "fraction": fraction,
-                        "count": len(g["items"]),})
+                        "count": len(g["items"]),
+                        "items": g["items"],})
     if missing_limits:
-        messagebox.showwarning("Missing Table A kBq/kg limits for " + ", ".join(missing_limits))
+        messagebox.showwarning("Missing Limits", "Missing Table A kBq/kg limits for " + ", ".join(missing_limits))
     return details, total_fraction, total_fraction < 1.0
 
 #=====TREE STATUS=====
@@ -462,7 +463,7 @@ def ensure_daily_log_sqlite():
                                                                       activity_mci REAL NOT NULL,
                                                                       permitted_date TEXT,
                                                                       recommended_date TEXT,
-                                                                      limit_mci REAL)""")
+                                                                      limit_kbq_kg REAL)""")
     conn.commit()
     return conn
 
@@ -486,7 +487,7 @@ def log_vials_disposal(vials_full_rows):
     conn.commit()
     conn.close()
 
-def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_rows, limit_mci=bq_to_mci(1e7)):
+def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_rows):
     conn = ensure_daily_log_sqlite()
     cur = conn.cursor()
     start_row = ws.max_row + 1
@@ -497,10 +498,10 @@ def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_r
     ws.cell(row=start_row, column=1).font = Font("bold")
     ws.cell(row=start_row, column=1).alignment = Alignment(horizontal="left")
     ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=9)
-    ws.cell(row=start_row + 1, column=1, value=f"(radionuclide={TC99M_NUCLIDE}, limit(mCi)={limit_mci})")
+    ws.cell(row=start_row + 1, column=1, value=f"(radionuclide={TC99M_NUCLIDE}, limit(kBq/kg)={DISPOSAL_LIMITS_KBQ_PER_KG[TC99M_NUCLIDE]})")
     ws.cell(row=start_row + 1, column=1).alignment = Alignment(horizontal="left")
     ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 1, end_column=9)
-    headers = ["ID", "Item Label", "Stored At", "Activity(mCi)", "Permitted Date", "Recommended Date"]
+    headers = ["ID", "Stored At", "Activity(mCi)", "Permitted Date", "Recommended Date"]
     header_row = start_row + 2
     for c,h in enumerate(headers, start=1):
         cell = ws.cell(row=header_row, column=c, value=h)
@@ -514,7 +515,6 @@ def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_r
         ws.cell(row=r, column=3, value=float(activity_mci))
         ws.cell(row=r, column=4, value=permitted)
         ws.cell(row=r, column=5, value=recommended)
-        ws.cell(row=r, column=6, value=float(limit_mci))
         r += 1
     ws.append([])
     widths = [8, 16, 12, 16, 16, 8]
@@ -525,12 +525,12 @@ def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_r
             ws.column_dimensions[col].width = w
     for item in items_rows:
         iid, item_label, stored_at, activity_mci, permitted, recommended = item
-        cur.execute("INSERT INTO disposed_tc99m_batches (batch_id, item_id, stored_at, activity_mci, permitted_date, recommended_date, limit_mci)"
-                    "VALUES (?,?,?,?,?,?,?)", (batch_name, iid, stored_at, float(activity_mci), permitted, recommended, float(limit_mci)))
+        cur.execute("INSERT INTO disposed_tc99m_batches (batch_id, item_id, stored_at, activity_mci, permitted_date, recommended_date, limit_kbq_kg)"
+                    "VALUES (?,?,?,?,?,?,?)", (batch_name, iid, stored_at, float(activity_mci), permitted, recommended, float(DISPOSAL_LIMITS_KBQ_PER_KG[TC99M_NUCLIDE])))
     conn.commit()
     conn.close()
 
-def log_tc99m_batch_disposal(batch_path: str, finalized_at: str, items_rows, limit_mci=bq_to_mci(1e7)):
+def log_tc99m_batch_disposal(batch_path: str, finalized_at: str, items_rows):
     disp_date = datetime.now().strftime(DATE_FORMAT)
     disp_time = datetime.now().strftime(HOUR_FORMAT)
     disp_dt_str = f"{disp_date} {disp_time}"
@@ -538,7 +538,7 @@ def log_tc99m_batch_disposal(batch_path: str, finalized_at: str, items_rows, lim
     xlsx_path = get_daily_disposal_excel_path(disp_date)
     wb = ensure_daily_log_workbook(xlsx_path)
     ws = wb["Tc99m"]
-    append_tc99m_batch(ws, batch_name=batch_name, finalized_at=finalized_at, disposed_dt_str=disp_dt_str, items_rows=items_rows, limit_mci=limit_mci)
+    append_tc99m_batch(ws, batch_name=batch_name, finalized_at=finalized_at, disposed_dt_str=disp_dt_str, items_rows=items_rows)
     wb.save(xlsx_path)
 
 #=====MARK VIAL AS DISPOSED=====
@@ -704,7 +704,7 @@ def finalize_active_batch():
     finalized_date = datetime.now().strftime(DATE_FORMAT)
     conn = sqlite3.connect(TC99M_REGISTRY_DB)
     cur = conn.cursor()
-    cur.execute("UPDATE batches SET finalized_at=? WHERE folder_path=? AND finalized_at IS NULL", (finalized_date, old_batch))
+    cur.execute("UPDATE batches SET finalized_at=? WHERE folder_path=?", (finalized_date, old_batch))
     conn.commit()
     conn.close()
     new_batch = create_new_batch_folder()
@@ -828,20 +828,37 @@ def sync_tc99m_elutions_for_disposal(dbfile):
             continue
         volume = float(volume or 0)
         concentration = float(concentration or 0)
-        used_volume_row = cur.execute("SELECT COALESCE(SUM(volume), 0) "
-                                      "FROM kits "
-                                      "WHERE parent_id IS NULL AND date = ? AND elution = ?",
-                                      (date_str, time_str)).fetchone()
-        used_volume = float(used_volume_row[0] or 0)
+        kit_rows = cur.execute("SELECT time, volume"
+                               "FROM kits"
+                               "WHERE parent_id IS NULL AND date=? AND elution=?"
+                               "ORDER BY time",
+                               (date_str, time_str)).fetchall()
+        used_volume = 0.0
+        last_labeling_time = time_str
+        for kit_time, kit_volume in kit_rows:
+            used_volume += float(kit_volume or 0)
+            if kit_time:
+                last_labeling_time = kit_time
         remaining_volume = round(volume - used_volume, 2)
         if remaining_volume < 0:
             remaining_volume = 0.0
-        remaining_activity = round(remaining_volume * concentration, 2)
+        try:
+            elution_dt = datetime.strptime(f"{date_str} {time_str}", f"{DATE_FORMAT} {HOUR_FORMAT}")
+            last_labeling_dt = datetime.strptime(f"{date_str} {last_labeling_time}", f"{DATE_FORMAT} {HOUR_FORMAT}")
+            delta_hours = (last_labeling_dt - elution_dt).total_seconds() / 3600.0
+            if delta_hours < 0:
+                delta_hours = 0.0
+            decayed_conc = decay_activity(concentration, T12_TC99M, delta_hours)
+        except Exception:
+            decayed_conc = concentration
+        remaining_activity = round(remaining_volume * decayed_conc, 2)
         stored_at = date_str
         item_id = f"Elution-{time_str}"
         item_label = f"Elution-{time_str}"
         if remaining_activity > 0:
-            recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE, activity_mci=remaining_activity, stored_at=stored_at)
+            recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE,
+                                                                                      activity_mci=remaining_activity,
+                                                                                      stored_at=stored_at)
             store_tc99m_item(item_id=item_id,
                              source_parent_id=f"ELUTION-{elution_id}",
                              item_label=item_label,
@@ -850,9 +867,9 @@ def sync_tc99m_elutions_for_disposal(dbfile):
                              activity_mci=remaining_activity,
                              permitted_date=permitted_date,
                              recommended_date=recommended_date)
-        cur.execute("UPDATE elutions SET stored_to_disposal = 1, stored_to_disposal_at = ?, disposal_item_id = ? WHERE id = ?",
-                    (datetime.now().strftime(DATE_FORMAT), item_id, elution_id))
-        synced_count += 1
+            cur.execute("UPDATE elutions SET stored_to_disposal = 1, stored_to_disposal_at = ?, disposal_item_id = ? WHERE id=?",
+                        (datetime.now().strftime(DATE_FORMAT), item_id, elution_id))
+            synced_count += 1
     conn.commit()
     conn.close()
     return synced_count

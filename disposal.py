@@ -118,17 +118,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
                 "",
                 f"Bag mass: {float(mass_kg):.3f} kg",
                 f"Σ fractions: {total_fraction:.4f}  (must be < 1)",
-                "",
-                "Breakdown:"
             ]
-            for d in clearance_details:
-                lines.append(
-                    f"- {d['radionuclide']}: "
-                    f"C={d['concentration_kbq_kg']:.4f} kBq/kg, "
-                    f"Limit={d['limit_kbq_kg']:.4f} kBq/kg, "
-                    f"Fraction={d['fraction']:.4f}, "
-                    f"vials={d['count']}"
-                )
             messagebox.showwarning("Not clearable", "\n".join(lines))
             return
         eligible = {}
@@ -144,23 +134,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
                 "items": d["items"],
             }
             eligible[nucl]["items"].sort(key=lambda x: (str(x["cal_date"]), x["id"]))
-        lines = [
-            "Eligible READY vials can be disposed together.",
-            "",
-            f"Bag mass: {float(mass_kg):.3f} kg",
-            f"Σ fractions: {total_fraction:.4f}  (< 1)",
-            "",
-            "Breakdown:"
-        ]
-        for nucl, g in sorted(eligible.items(), key=lambda kv: kv[0]):
-            lines.append(
-                f"- {nucl}: {g['total_now']:.2f} mCi | "
-                f"C={g['concentration_kbq_kg']:.4f} kBq/kg | "
-                f"Limit={g['limit_kbq_kg']:.4f} kBq/kg | "
-                f"Fraction={g['fraction']:.4f} | "
-                f"vials={len(g['items'])}"
-            )
-        messagebox.showinfo("Clearance passed", "\n".join(lines))
+        messagebox.showinfo("Clearance passed", "Clearance passed")
         popup = Toplevel(parent_tab)
         popup.title("Eligible READY Vials (Table A clearance passed)")
         Label(popup, text="Select radionuclides to dispose", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(
@@ -192,25 +166,6 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
                                     f"{g['limit_kbq_kg']:.4f}",
                                     f"{g['fraction']:.4f}",
                                     str(len(g["items"]))))
-
-        def refresh_details(_evt=None):
-            t_det.delete(*t_det.get_children())
-            sel = t_groups.selection()
-            if not sel:
-                return
-            for nucl in sel:
-                g = eligible.get(nucl)
-                if not g:
-                    continue
-                for it in g["items"]:
-                    t_det.insert("", "end", values=(
-                        it["id"], it["radionuclide"], it["cal_date"], it["stored_at"],
-                        f"{it['activity0']:.2f}", f"{it['activity_now']:.2f}", it["permitted"]
-                    ))
-
-        t_groups.bind("<<TreeviewSelect>>", refresh_details)
-        t_groups.selection_set(t_groups.get_children())
-        refresh_details()
         def refresh_details(_evt=None):
             t_det.delete(*t_det.get_children())
             sel = t_groups.selection()
@@ -312,7 +267,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
         Button(parent_tab, text="Back", **TAB_BUTTON_STYLE, command=on_back).pack(pady=(0, 10))
     def auto_refresh():
         refresh()
-        parent_tab.after(6000, auto_refresh)
+        parent_tab.after(600000, auto_refresh)
     auto_refresh()
     refresh()
 
@@ -335,14 +290,47 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
         if not state["batch_path"]:
             return
         created_at, finalized_at, disposed_at = read_batch_info(state["batch_path"])
-        if finalized_at is None:
+        if finalized_at is None and not state["read_only"]:
             messagebox.showwarning("Warning", "This batch is not Finalized.")
             return
         if disposed_at is not None:
             messagebox.showinfo("Info", "This batch is already disposed.")
             return
+        rows = read_tc99m_items(state["batch_path"])
+        if not rows:
+            messagebox.showwarning("Warning", "No items in this batch.")
+            return
+        ready_count = 0
+        for r in rows:
+            iid, item_label, stored_at, activity_mci, permitted, recommended = r
+            try:
+                status = disposal_status(recommended, permitted)
+            except Exception:
+                status = "STORED"
+            if status == "READY":
+                ready_count += 1
+        if ready_count != len(rows):
+            messagebox.showwarning("Not READY", f"All items must be READY before disposal.\n\nREADY: {ready_count}/{len(rows)}")
+            return
+        mass_kg = simpledialog.askfloat("Bag Mass", "Enter total bag mass in kg:", parent=parent_tab, minvalue=0.0001)
+        if mass_kg is None or mass_kg <= 0:
+            messagebox.showerror("Error", "Please enter a valid kg value.")
+            return
+        total_activity_now_mci = 0.0
+        for r in rows:
+            iid, item_label, stored_at, activity_mci, permitted, recommended = r
+            a_now = activity_now(TC99M_NUCLIDE, stored_at, activity_mci)
+            total_activity_now_mci += float(a_now)
+        total_activity_kbq = mci_to_kbq(total_activity_now_mci)
+        concentration = total_activity_kbq / float(mass_kg)
+        limit_kbq_kg = DISPOSAL_LIMITS_KBQ_PER_KG[TC99M_NUCLIDE]
+        fraction = concentration / float(limit_kbq_kg)
+        if fraction >= 1.0:
+            messagebox.showwarning("Not clearable", "This batch is not ready to be disposed.")
+            return
         if not messagebox.askyesno("Dispose Batch", "Dispose this FINALIZED Batch?\nThis will be logged and the batch will be marked as disposed."):
             return
+        log_tc99m_batch_disposal(state["batch_path"], finalized_at, rows)
         dispose_batch(state["batch_path"])
         messagebox.showinfo("Disposed", "Batch marked as disposed.")
         refresh()
@@ -362,16 +350,49 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
             status = disposal_status(recommended, permitted)
             tree.insert("", "end", iid=str(iid), values=[item_label, stored_at, float(activity_mci), permitted, recommended, status], tags=(status,))
             summary_rows.append((iid, TC99M_NUCLIDE, None, stored_at, float(activity_mci), permitted, recommended, None))
-        total_items, total_activity, ready_count = disposal_summary(summary_rows)
+        total_activity = 0.0
+        ready_count = 0
+        for r in rows:
+            iid, item_label, stored_at, activity_mci, permitted, recommended = r
+            try:
+                status = disposal_status(recommended, permitted)
+            except Exception:
+                status = "STORED"
+            try:
+                a_now = activity_now(TC99M_NUCLIDE, stored_at, activity_mci)
+            except Exception:
+                a_now = float(activity_mci)
+            if status == "READY":
+                ready_count += 1
+        total_activity = round(total_activity, 2)
+        total_items = len(rows)
+        all_ready = total_items > 0 and ready_count == total_items
         summary_label.config(text=f"Total vials: {total_items}   |   Total activity Now: {total_activity} mCi   |   READY: {ready_count}")
         created_at, finalized_at, disposed_at = read_batch_info(batch_path)
+        if disposed_at is not None:
+            mode_label.config(text=f"DISPOSED on {disposed_at}", fg="red")
+        elif read_only:
+            if finalized_at is not None:
+                mode_label.config(text=f"FINALIZED on {finalized_at}", fg="orange")
+            else:
+                mode_label.config(text="READ ONLY (Finalized/Old Batch)", fg="orange")
+        else:
+            mode_label.config(text="ACTIVE BATCH", fg="orange")
         if not read_only:
             action_btn.config(text="✗Finalize Batch✗", command=finalize_batch, state="normal")
             return
-        if finalized_at is not None and disposed_at is None:
-            action_btn.config(text="✗Dispose Batch✗", command=dispose_current_batch, state="normal")
+        if read_only and disposed_at is None and all_ready:
+            action_btn.config(text="✗Dispose Batch✗",
+                              command=dispose_current_batch,
+                              state="normal")
+        elif disposed_at is not None:
+            action_btn.config(text="✗Dispose Batch✗",
+                              command=dispose_current_batch,
+                              state="disabled")
         else:
-            action_btn.config(text="✗Dispose Batch✗", command=lambda: None, state="disabled")
+            action_btn.config(text="✗Dispose Batch✗",
+                              command=dispose_current_batch,
+                              state="disabled")
     def refresh():
         if not state["batch_path"]:
             load_active()
@@ -392,7 +413,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
             return
         old_batch, new_batch = finalize_active_batch()
         messagebox.showinfo("Batch Finalized", f"Old batch closed:\n{os.path.basename(old_batch)}\n\nNew active batch:\n\n{os.path.basename(new_batch)}")
-        load_batch(new_batch, read_only=False)
+        load_batch(new_batch, read_only=True)
     btns = Frame(parent_tab, bg=C4)
     btns.pack(pady=(10,15))
     Button(btns, text="Refresh", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=12, height=1, font=(FONT_NAME, 12, "bold"), command=refresh).grid(row=0, column=0, padx=6)
@@ -424,6 +445,6 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
         Button(parent_tab, text="Back", **TAB_BUTTON_STYLE, command=on_back).pack(pady=(0,10))
     def auto_refresh():
         refresh()
-        parent_tab.after(6000, auto_refresh)
+        parent_tab.after(600000, auto_refresh)
     auto_refresh()
     load_active()
