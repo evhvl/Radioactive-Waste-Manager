@@ -78,9 +78,8 @@ def build_tab(app, tab):
                     messagebox.showerror("Error", f"Enter {name}")
                     return
                 values[name] = val
-            try:
-                values["Activity (MBq)"] = float(values["Activity (MBq)"])
-            except ValueError:
+            values["Activity (MBq)"] = get_float(values["Activity (MBq)"])
+            if values["Activity (MBq)"] is None:
                 messagebox.showerror("Error", "Enter valid Activity (MBq)")
                 return
             gen_id = values["Generator ID"]
@@ -227,7 +226,7 @@ def build_tab(app, tab):
         #Save New Data
         def add_record():
             try:
-                a = round(float(elution_activity_entry.get()), 2)
+                a = round(get_float(elution_activity_entry), 2)
             except ValueError:
                 messagebox.showerror("Error", "Invalid Activity")
                 return
@@ -369,7 +368,7 @@ def build_tab(app, tab):
                     messagebox.showerror("Error", "Please select an elution from the dropdown.")
                     return
                 patient = patient_entry.get().strip()
-                weight = int(weight_entry.get())
+                weight =  int(get_float(weight_entry))
                 dose = round(max(weight * 0.067 + 0.2 + (0.5 if weight > 90 else 0), 5.2), 2)
                 row = cur.execute("SELECT activity, date, TRIM(time) FROM elutions WHERE date=? AND TRIM(time)=? ORDER BY rowid DESC LIMIT 1", (date_str, elution_time_selected,)).fetchone()
                 if not row:
@@ -448,7 +447,7 @@ def build_tab(app, tab):
             popup = Toplevel()
             popup.title("Update Real Dose")
             popup.configure(bg=BG)
-            center_window(popup, 280, 140)
+            center_window(popup, 280, 120)
             frame = Frame(popup, bg=BG)
             frame.pack(expand=True, fill="both", padx=10, pady=10)
             Label(frame, text="Real Dose (mCi):", bg=BG, fg="white", font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=5, pady=10)
@@ -457,8 +456,8 @@ def build_tab(app, tab):
             real_dose_entry.grid(row=0, column=1, padx=5, pady=10)
             def save_real_dose():
                 try:
-                    real_dose = float(real_dose_entry.get().strip())
-                    conc_val = float(concentration)
+                    real_dose = get_float(real_dose_entry)
+                    conc_val = get_float(concentration)
                 except ValueError:
                     messagebox.showerror("Error", "Invalid Real Dose.")
                     return
@@ -467,7 +466,7 @@ def build_tab(app, tab):
                     return
                 new_volume = round(real_dose / conc_val, 3)
                 cur.execute("UPDATE dotatoc SET dose=?, volume=? WHERE id=?",
-                            (f"{real_dose:.2f}", f"{new_volume:.1f}", row_id))
+                            (f"{real_dose:.2f}", f"{new_volume:.2f}", row_id))
                 conn.commit()
                 update_dotatoc_excel(dbfile=dbfile,
                                      row_id=row_id,
@@ -476,7 +475,7 @@ def build_tab(app, tab):
                                      new_concentration=conc_val,
                                      new_itlc=old_itlc,
                                      new_residual=old_residual)
-                dotatoc_tree.item(row_id, values=(date_val, weight, admin_time, f"{real_dose:.2f}", f"{new_volume:.1f}", f"{conc_val:.2f}", old_itlc, old_residual))
+                dotatoc_tree.item(row_id, values=(date_val, weight, admin_time, f"{real_dose:.2f}", f"{new_volume:.2f}", f"{conc_val:.2f}", old_itlc, old_residual))
                 popup.destroy()
             Button(frame, text="Save", command=save_real_dose, **{k: v for k, v in BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                     width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=10, pady=10)
@@ -496,9 +495,9 @@ def build_tab(app, tab):
             old_residual = values[7]
             popup = Toplevel()
             popup.title("Update ITLC")
-            popup.geometry("240x150")
+            popup.geometry("240x120")
             popup.configure(bg=BG)
-            center_window(popup, 240, 150)
+            center_window(popup, 240, 120)
             frame = Frame(popup, bg=BG)
             frame.pack(expand=True, fill="both", padx=10, pady=10)
             Label(frame, text="ITLC (<2%):", bg=BG, fg="white", font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=5, pady=10)
@@ -508,7 +507,7 @@ def build_tab(app, tab):
             itlc_entry.grid(row=0, column=1, padx=5, pady=10)
             def save_itlc():
                 try:
-                    new_itlc = float(itlc_entry.get().strip())
+                    new_itlc = get_float(itlc_entry)
                 except ValueError:
                     messagebox.showerror("Error", "Invalid ITLC value.")
                     return
@@ -540,19 +539,19 @@ def build_tab(app, tab):
             old_residual = values[7]
             popup = Toplevel()
             popup.title("Update Residual")
-            popup.geometry("240x150")
+            popup.geometry("260x120")
             popup.configure(bg=BG)
-            center_window(popup, 240, 150)
+            center_window(popup, 260, 120)
             frame = Frame(popup, bg=BG)
             frame.pack(expand=True, fill="both", padx=10, pady=10)
-            Label(frame, text="Residual:", bg=BG, fg="white", font=(FONT_NAME, 10, "bold")).grid(row=0, column=0, padx=5, pady=10)
+            Label(frame, text="Residual(mCi) :", bg=BG, fg="white", font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=5, pady=10)
             residual_entry = Entry(frame, width=10)
             if old_residual not in ("", None):
                 residual_entry.insert(0, str(old_residual))
             residual_entry.grid(row=0, column=1, padx=5, pady=10)
             def save_residual():
                 try:
-                    new_residual = float(residual_entry.get().strip())
+                    new_residual = get_float(residual_entry.get().strip())
                 except ValueError:
                     messagebox.showerror("Error", "Invalid Residual value.")
                     return

@@ -78,9 +78,8 @@ def build_tab(app, tab):
                     messagebox.showerror("Error", f"Enter {name}")
                     return
                 values[name] = val
-            try:
-                values["Mo Activity (mCi)"] = float(values["Mo Activity (mCi)"])
-            except ValueError:
+            values["Mo Activity (mCi)"] = get_float(values["Mo Activity (mCi)"])
+            if values["Mo Activity (mCi)"] is None:
                 messagebox.showerror("Error", "Enter valid Activity (mCi)")
                 return
             gen_id = values["Generator ID"]
@@ -270,8 +269,8 @@ def build_tab(app, tab):
                 return A_mo_now * (LAMBDA_TC / dlam) * (1 - math.exp(-dlam * dt_hours))
 
             try:
-                a = round(float(elution_activity_entry.get()), 2)
-                v = round(float(elution_volume_entry.get()), 1)
+                a = round(get_float(elution_activity_entry), 2)
+                v = round(get_float(elution_volume_entry), 1)
                 conc = round(a / v, 2) if v > 0 else 0.0
                 d = elution_date_entry.get()
                 t = elution_time_entry.get()
@@ -462,7 +461,7 @@ def build_tab(app, tab):
             #Calculate Volume
             def calculate_volume(*args):
                 try:
-                    required_activity = float(req_activity.get())
+                    required_activity = get_float(req_activity)
                     selected_time = selected_elution.get()
                     el_date, el_time, el_act, el_vol, el_conc = elution_map[selected_time]
                     elution_dt = datetime.strptime(el_date + " " + el_time, "%d-%m-%Y %H:%M")
@@ -485,7 +484,7 @@ def build_tab(app, tab):
                     time_val = time_entry.get()
                     kit_val = kit_name
                     volume_val = float(required_volume_lbl.cget("text").replace(" ml", "").replace("--", "0"))
-                    activity_val = float(req_activity.get())
+                    activity_val = get_float(req_activity)
                     kit_config = KIT_CONFIG.get(kit_val, {})
                     dilution_cfg = kit_config.get("dilution", "0ml")
                     if isinstance(dilution_cfg, str) and "ml" in dilution_cfg:
@@ -581,7 +580,7 @@ def build_tab(app, tab):
             #Save Actual Values For Parent
             def save():
                 try:
-                    actual_activity = float(actual_activity_entry.get())
+                    actual_activity = get_float(actual_activity_entry)
                 except ValueError:
                     messagebox.showerror("Error", "Invalid value.")
                     return
@@ -661,7 +660,7 @@ def build_tab(app, tab):
             popup = Toplevel(tab)
             popup.title("Insert Actual Values")
             popup.config(bg=C4, pady=15)
-            center_window(popup, 300, 140)
+            center_window(popup, 280, 140)
             values = list(kit_tree.item(child_id, "values"))
             planned_dose = values[6].split("→")[0].strip()
             Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=5, pady=10)
@@ -672,7 +671,7 @@ def build_tab(app, tab):
             #Save Actual Values for Child
             def save():
                 try:
-                    actual_dose = float(actual_dose_entry.get())
+                    actual_dose = get_float(actual_dose_entry)
                 except ValueError:
                     messagebox.showerror("Error", "Invalid values.")
                     return
@@ -804,7 +803,7 @@ def build_tab(app, tab):
             popup = Toplevel()
             popup.title("Patient Data")
             popup.configure(bg=C4)
-            center_window(popup, 290, 190)
+            center_window(popup, 270, 190)
             frame = Frame(popup, bg=C4)
             frame.pack(expand=True, fill="both", anchor="center", padx=10, pady=10)
             Label(frame, text="Patient Name: ", font=(FONT_NAME, 14), **TEXT_COLORS).grid(row=0, column=0, pady=5)
@@ -828,7 +827,7 @@ def build_tab(app, tab):
             def save_patient():
                 name = name_entry.get().strip()
                 try:
-                    dose = float(dose_entry.get().strip())
+                    dose = get_float(dose_entry)
                 except ValueError:
                     messagebox.showerror("Error", "Please enter a valid Dose in mCi.")
                     return

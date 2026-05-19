@@ -78,8 +78,8 @@ def build_tab(app, tab, vial_name):
                     return
                 values[name] = val
             try:
-                activity = float(values["Activity(mCi)"])
-                volume = float(values["Volume(ml)"])
+                activity = get_float(values["Activity(mCi)"])
+                volume = get_float(values["Volume(ml)"])
             except ValueError:
                 messagebox.showerror("Error", "Activity & Volume must be numbers!")
                 return
@@ -221,7 +221,7 @@ def build_tab(app, tab, vial_name):
             def on_ok():
                 nonlocal final_activity
                 try:
-                    v = float(res_var.get().replace(",","."))
+                    v = get_float(res_var)
                     if v < 0:
                         raise ValueError
                 except ValueError:
@@ -371,7 +371,7 @@ def build_tab(app, tab, vial_name):
                 messagebox.showerror("Error", "Please enter Patient Name.")
                 return
             try:
-                dose = float(dose_entry.get())
+                dose = get_float(dose_entry)
                 if dose <= 0:
                     raise ValueError
             except ValueError:
@@ -407,6 +407,7 @@ def build_tab(app, tab, vial_name):
             append_row_to_sheet(excel_path, "Administrations",
                                 [row_id, admin_date, admin_time, patient_name_entry.get(), updated_conc,
                                  dose, dose_volume, volume_left])
+            dose_entry.delete(0, END)
 
         #Enter + Save Corrected Dose + Volume
         def on_double_click(event):
@@ -428,7 +429,7 @@ def build_tab(app, tab, vial_name):
 
             def save_actual():
                 try:
-                    dose_actual = float(dose_actual_entry.get())
+                    dose_actual = get_float(dose_actual_entry)
                 except ValueError:
                     messagebox.showerror("Error", "Invalid dose.")
                     return

@@ -261,6 +261,15 @@ def update_header_and_disable(cur, header, tab, is_stored=False, is_disposed=Fal
         header.config(text="⚠ GENERATOR EXPIRED – NO FURTHER ACTIONS ALLOWED", fg="#FF8000", highlightthickness=0, font=(FONT_NAME,23,"bold"))
         disable_buttons(tab, exempt_texts=["Back", "Load", "✗Store Gen✗"])
 
+def get_float(value, default=None):
+    try:
+        if hasattr(value, "get"):
+            value = value.get()
+        text = str(value).strip().replace(",", ".")
+        return float(text)
+    except (ValueError, TypeError):
+        return default
+
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
 

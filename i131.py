@@ -3,6 +3,8 @@ from tkcalendar import DateEntry
 from constants import *
 from tkinter import messagebox
 import os, pandas, sqlite3
+from functions import get_float
+
 
 def build_tab(app, tab):
 
@@ -41,7 +43,7 @@ def build_tab(app, tab):
         try:
             patient_name = name_entry.get().strip()
             cal_date = calib_entry.get_date()
-            A0_mbq = float(activity_entry.get().strip())
+            A0_mbq = get_float(activity_entry)
             if not A0_mbq:
                 raise ValueError("Please enter the Initial Activity (MBq)")
             admin_date = admin_entry.get_date()
@@ -49,7 +51,7 @@ def build_tab(app, tab):
             df = math.exp(-math.log(2) * days_diff / T12_I131)
             A_admin_mbq = A0_mbq * df
             A_admin_mci = mbq_to_mci(A_admin_mbq)
-            serial_number = serial_number_entry.get().strip()
+            serial_number = get_float(serial_number_entry)
             # Show Output
             result_txt.configure(state="normal")
             result_txt.delete("1.0", END)
@@ -75,9 +77,9 @@ def build_tab(app, tab):
             if not patient_name:
                 messagebox.showerror("Save Error", "Please enter Patient Name.")
             cal_date = calib_entry.get_date()
-            A0_mbq = float(activity_entry.get().strip())
+            A0_mbq = get_float(activity_entry)
             admin_date = admin_entry.get_date()
-            serial_number = serial_number_entry.get().strip()
+            serial_number = get_float(serial_number_entry)
             days_diff = (admin_date - cal_date).days
             df = math.exp(-math.log(2) * days_diff / T12_I131)
             A_admin_mbq = A0_mbq * df
