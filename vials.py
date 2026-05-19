@@ -1,3 +1,4 @@
+import os.path
 import string
 from functions import *
 from constants import *
@@ -246,9 +247,29 @@ def build_tab(app, tab, vial_name):
             recommended, permitted, limit_bq = calc_recommended_and_permitted_date(vial_name, current_activity_mci, stored_at)
             if recommended is None or permitted is None:
                 return
-            store_vial(radionuclide=vial_name, source_db=dbfile, calibration_date=date, stored_at=stored_at,
-                                activity_mci=current_activity_mci, permitted_date=permitted,
-                                recommended_date=recommended, limit_bq=limit_bq)
+            if vial_name == "177-Lu":
+                store_item(item_id=f"Lu177-{os.path.basename(dbfile)}",
+                           source_parent_id=dbfile,
+                           item_label=vial_name,
+                           kit_name=vial_name,
+                           stored_at=stored_at,
+                           activity_mci=current_activity_mci,
+                           radionuclide=vial_name,
+                           base_dir=LU177_DIR,
+                           registry_db=LU177_REGISTRY_DB,
+                           permitted_date=permitted,
+                           recommended_date=recommended)
+                msg_storage = "Lu177 batch disposal"
+            else:
+                store_vial(radionuclide=vial_name,
+                           source_db=dbfile,
+                           calibration_date=date,
+                           stored_at=stored_at,
+                           activity_mci=current_activity_mci,
+                           permitted_date=permitted,
+                           recommended_date=recommended,
+                           limit_bq=limit_bq)
+                msg_storage = "Vials Disposal"
             cur.execute("UPDATE vial_info SET stored_date=?", (stored_at,))
             conn.commit()
             folder = os.path.dirname(dbfile)
@@ -257,7 +278,7 @@ def build_tab(app, tab, vial_name):
             ws = wb["Vial Info"]
             ws.cell(row=2, column=7, value=stored_at)
             wb.save(excel_path)
-            messagebox.showinfo("Vial Stored",f"{vial_name} vial stored successfully.\n\nRecommended disposal after: {recommended}\nPermitted disposal after: {permitted}")
+            messagebox.showinfo("Vial Stored",f"{vial_name} vial stored successfully in {msg_storage}.\n\nRecommended disposal after: {recommended}\nPermitted disposal after: {permitted}")
 
         dispose_button = Button(info_frame, text="✗Store Vial✗",**{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                                 width=14, height=1, font=(FONT_NAME, 12, "bold"), command=store_current_vial)
@@ -325,9 +346,10 @@ def build_tab(app, tab, vial_name):
             for rid, vol_p_db, vol_a_db in rows:
                 used = vol_a_db if vol_a_db is not None else vol_p_db
                 used = float(used) if used is not None else 0.0
-                current_vol_left = round(current_vol_left - used, 1)
+                current_vol_left = round(current_vol_left - used, 2)
                 if current_vol_left < 0:
-                    current_vol_left = 0.0
+                    messagebox.showerror("Error", "Not enough volume left in vial.")
+                    return False
                 cur.execute("UPDATE patient_info SET volume_left=? WHERE id=?", (current_vol_left, rid))
             conn.commit()
             folder = os.path.dirname(dbfile)
@@ -341,6 +363,7 @@ def build_tab(app, tab, vial_name):
                 if key in excel_row_map:
                     ws.cell(row=excel_row_map[key], column=8, value=left_val)
             wb.save(excel_path)
+            return True
 
         #Save New Data
         def add_record():
@@ -385,73 +408,83 @@ def build_tab(app, tab, vial_name):
                                 [row_id, admin_date, admin_time, patient_name_entry.get(), updated_conc,
                                  dose, dose_volume, volume_left])
 
-            #Enter + Save Corrected Dose + Volume
-            def on_double_click(event):
-                selected = tree.selection()
-                if not selected:
-                    return
-                popup = Toplevel(tab)
-                popup.title("Insert Actual Administration Values")
-                popup.config(bg=C4, pady=15)
-                center_window(popup, 290, 120)
-                Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=10, pady=5)
-                dose_actual_entry = Entry(popup, width=10)
-                dose_actual_entry.insert(0, f"{dose}")
-                dose_actual_entry.grid(row=0, column=1)
+        #Enter + Save Corrected Dose + Volume
+        def on_double_click(event):
+            row_id = tree.identify_row(event.y)
+            if not row_id:
+                return
+            row_id = int(row_id)
+            popup = Toplevel(tab)
+            popup.title("Insert Actual Administration Values")
+            popup.config(bg=C4, pady=15)
+            center_window(popup, 290, 120)
+            dose_row = cur.execute("SELECT dose_actual, dose_planned FROM patient_info WHERE id=?", (row_id,)).fetchone()
+            dose_actual_db, dose_planned_db = dose_row
+            dose = dose_actual_db if dose_actual_db is not None else dose_planned_db
+            Label(popup, text="Actual Dose (mCi):", **TEXT_COLORS, font=(FONT_NAME, 14, "bold")).grid(row=0, column=0, padx=10, pady=5)
+            dose_actual_entry = Entry(popup, width=10)
+            dose_actual_entry.insert(0, f"{dose}")
+            dose_actual_entry.grid(row=0, column=1)
 
-                def save_actual():
-                    row_id = int(selected[0])
-                    try:
-                        dose_actual = float(dose_actual_entry.get())
-                    except ValueError:
-                        messagebox.showerror("Error", "Invalid dose.")
-                        return
-                    row_conc = cur.execute("SELECT concentration FROM patient_info WHERE id=?", (row_id,)).fetchone()
-                    conc_now = float(row_conc[0])
-                    if conc_now <= 0:
-                        messagebox.showerror("Error", "Concentration mush be > 0.")
-                        return
-                    volume_actual = round(dose_actual / conc_now, 2)
-                    cur.execute("""UPDATE patient_info SET dose_actual=?, volume_actual=? WHERE id=?""",
-                                (dose_actual, volume_actual, row_id))
+            def save_actual():
+                try:
+                    dose_actual = float(dose_actual_entry.get())
+                except ValueError:
+                    messagebox.showerror("Error", "Invalid dose.")
+                    return
+                row_conc = cur.execute("SELECT concentration FROM patient_info WHERE id=?", (row_id,)).fetchone()
+                conc_now = float(row_conc[0])
+                if conc_now <= 0:
+                    messagebox.showerror("Error", "Concentration mush be > 0.")
+                    return
+                old_vals = cur.execute("SELECT dose_actual, volume_actual FROM patient_info WHERE id=?", (row_id,)).fetchone()
+                old_dose_actual, old_volume_actual = old_vals
+                volume_actual = round(dose_actual / conc_now, 2)
+                cur.execute("""UPDATE patient_info SET dose_actual=?, volume_actual=? WHERE id=?""",
+                            (dose_actual, volume_actual, row_id))
+                conn.commit()
+                ok = update_volume_after_delete_or_change()
+                if not ok:
+                    cur.execute("UPDATE patient_info SET dose_actual=?, volume_actual=? WHERE id=?", (old_dose_actual, old_volume_actual, row_id))
                     conn.commit()
                     update_volume_after_delete_or_change()
-                    folder = os.path.dirname(dbfile)
-                    excel_path = os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
-                    wb = load_workbook(excel_path)
-                    ws = wb["Administrations"]
-                    updated_rows = cur.execute("SELECT id, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
-                    excel_row_map = {str(row[0].value): row[0].row for row in ws.iter_rows(min_row=2) if row[0].value is not None}
-                    for rid, dose_a, vol_a, vol_left in updated_rows:
-                        key = str(rid)
-                        if key in excel_row_map:
-                            excel_row = excel_row_map[key]
-                            if str(rid) == str(row_id):
-                                ws.cell(row=excel_row, column=6, value=dose_a)
-                                ws.cell(row=excel_row, column=7, value=vol_a)
-                            ws.cell(row=excel_row, column=8, value=vol_left)
-                    wb.save(excel_path)
-                    tree.delete(*tree.get_children())
-                    rows = cur.execute("SELECT id, cal_date, cal_time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
-                    for r in rows:
-                        rid = r[0]
-                        date_v, time_v, patient, conc_v, dose_p, vol_p, dose_a, vol_a, vol_left = r[1:]
-                        dose_txt = f"{dose_a:.2f}" if dose_a is not None else f"{dose_p}"
-                        vol_txt = f"{vol_a:.2f}" if vol_a is not None else f"{vol_p}"
-                        tree.insert("", "end", iid=rid,
-                                    values=(date_v, time_v, patient, f"{conc_v:.2f}", dose_txt, vol_txt,
-                                            f"{vol_left:.2f}" if vol_left is not None else "-"))
-                    popup.destroy()
+                    return
+                folder = os.path.dirname(dbfile)
+                excel_path = os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
+                wb = load_workbook(excel_path)
+                ws = wb["Administrations"]
+                updated_rows = cur.execute("SELECT id, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
+                excel_row_map = {str(row[0].value): row[0].row for row in ws.iter_rows(min_row=2) if row[0].value is not None}
+                for rid, dose_a, vol_a, vol_left in updated_rows:
+                    key = str(rid)
+                    if key in excel_row_map:
+                        excel_row = excel_row_map[key]
+                        if str(rid) == str(row_id):
+                            ws.cell(row=excel_row, column=6, value=dose_a)
+                            ws.cell(row=excel_row, column=7, value=vol_a)
+                        ws.cell(row=excel_row, column=8, value=vol_left)
+                wb.save(excel_path)
+                tree.delete(*tree.get_children())
+                rows = cur.execute("SELECT id, cal_date, cal_time, patient_name, concentration, dose_planned, volume_planned, dose_actual, volume_actual, volume_left FROM patient_info ORDER BY id").fetchall()
+                for r in rows:
+                    rid = r[0]
+                    date_v, time_v, patient, conc_v, dose_p, vol_p, dose_a, vol_a, vol_left = r[1:]
+                    dose_txt = f"{dose_a:.2f}" if dose_a is not None else f"{dose_p}"
+                    vol_txt = f"{vol_a:.2f}" if vol_a is not None else f"{vol_p}"
+                    tree.insert("", "end", iid=rid,
+                                values=(date_v, time_v, patient, f"{conc_v:.2f}", dose_txt, vol_txt,
+                                        f"{vol_left:.2f}" if vol_left is not None else "-"))
+                popup.destroy()
 
-                Button(popup, text="OK", command=save_actual,
-                       **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-                       width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, pady=10, padx=6)
-                Button(popup, text="Cancel", command=popup.destroy,
-                       **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['bg', 'width', 'height', 'font']},
-                       bg=C4, width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=1, pady=10, padx=6)
+            Button(popup, text="OK", command=save_actual,
+                    **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
+                    width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, pady=10, padx=6)
+            Button(popup, text="Cancel", command=popup.destroy,
+                    **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['bg', 'width', 'height', 'font']},
+                    bg=C4, width=8, height=1, font=(FONT_NAME, 12, "bold")).grid(row=1, column=1, pady=10, padx=6)
 
-            tree.bind("<Double-1>", on_double_click)
-            dose_entry.delete(0, "end")
+        tree.bind("<Double-1>", on_double_click)
+        dose_entry.delete(0, "end")
 
         add_button = Button(add_frame, text="Add", command=add_record,
                             **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
