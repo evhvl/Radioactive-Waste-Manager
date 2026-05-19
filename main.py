@@ -40,6 +40,10 @@ class Tabs:
             disposal.build_vials_disposal_tab(new_tab, on_back=lambda: self.back_to_main(new_tab))
         elif tab_name == "Tc99m Disp":
             disposal.build_tc99m_disposal_tab(new_tab, on_back=lambda: self.back_to_main(new_tab))
+        elif tab_name == "Ga68 Disp":
+            disposal.build_ga68_disposal_tab(new_tab, on_back=lambda: self.back_to_main(new_tab))
+        elif tab_name == "Lu177 Disp":
+            disposal.build_lu177_disposal_tab(new_tab, on_back=lambda: self.back_to_main(new_tab))
 
     #=====CUSTOMIZE EACH TAB=====
     def _tab_vials(self, tab):
@@ -62,6 +66,8 @@ class Tabs:
     def _tab_disposal(self, tab):
         frame = Frame(tab, bg=C4)
         frame.pack(expand=True)
-        Button(frame, text="Vials", **GEN_BUTTON_STYLE, command=lambda: self.create_new_tab("Vials Disp")).grid(row=0, column=0, sticky="e", padx=20, pady=10)
-        Button(frame, text="Tc99m", **GEN_BUTTON_STYLE, command=lambda: self.create_new_tab("Tc99m Disp")).grid(row=0, column=1, sticky="w", padx=20, pady=10)
-        Button(tab, text="Back", **TAB_BUTTON_STYLE, command=lambda nt=tab: self.back_to_main(nt)).pack(pady=40)
+        Button(frame, text="Vials", **GEN_BUTTON_STYLE, command=lambda: self.create_new_tab("Vials Disp")).grid(row=0, column=0, sticky="e", padx=20, pady=5)
+        Button(frame, text="Tc99m", **GEN_BUTTON_STYLE, command=lambda: self.create_new_tab("Tc99m Disp")).grid(row=0, column=1, sticky="w", padx=20, pady=5)
+        Button(frame, text="Ga68", **GEN_BUTTON_STYLE, command=lambda: self.create_new_tab("Ga68 Disp")).grid(row=1, column=0, sticky="e", padx=20, pady=5)
+        Button(frame, text="Lu177", **GEN_BUTTON_STYLE, command=lambda: self.create_new_tab("Lu177 Disp")).grid(row=1, column=1, sticky="w", padx=20, pady=5)
+        Button(tab, text="Back", **TAB_BUTTON_STYLE, command=lambda nt=tab: self.back_to_main(nt)).pack(pady=10)

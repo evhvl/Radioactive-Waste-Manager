@@ -293,16 +293,22 @@ def decay_activity(activity_mci, half_life_hours, delta_hours):
     lambda_ = math.log(2) / half_life_hours
     return float(activity_mci) * math.exp(-lambda_ * float(delta_hours))
 
+def get_half_life_hours(radionuclide):
+    if radionuclide == TC99M_NUCLIDE:
+        return T12_TC99M
+    if radionuclide in ("Ga-68", "Ga68"):
+        return T12_GA68 / 60.0
+    if radionuclide in ("Lu-177", "Lu177"):
+        return T12_LU177
+    return next(hl for name, hl in VIAL_DATA if name == radionuclide)
+
 def activity_now(radionuclide, stored_at_str, activity0):
     now_dt = datetime.now()
     stored_dt = datetime.strptime(stored_at_str, DATE_FORMAT)
     delta_h = (now_dt - stored_dt).total_seconds() / 3600.0
     if delta_h < 0:
         delta_h = 0.0
-    if radionuclide == TC99M_NUCLIDE:
-        half_life = T12_TC99M
-    else:
-        half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
+    half_life = get_half_life_hours(radionuclide)
     return float(decay_activity(float(activity0), float(half_life), float(delta_h)))
 
 def calc_date_below_limit(activity_mci, half_life_hours, limit_bq, start_date):
@@ -319,15 +325,11 @@ def calc_date_below_limit(activity_mci, half_life_hours, limit_bq, start_date):
 
 def calc_recommended_and_permitted_date(radionuclide, activity_mci, stored_at, safety_factor=0.1):
     start_date = datetime.strptime(stored_at, DATE_FORMAT)
-    if radionuclide == TC99M_NUCLIDE:
-        half_life = T12_TC99M
-    else:
-        half_life = next(hl for name, hl in VIAL_DATA if name == radionuclide)
-    limit_bq = DISPOSAL_LIMITS_BQ[radionuclide]
-    if limit_bq in (None, 0):
-        recommended = (start_date + timedelta(days=60)).strftime(DATE_FORMAT)
-        permitted = (start_date + timedelta(days=60)).strftime(DATE_FORMAT)
-        return recommended, permitted, None
+    half_life = get_half_life_hours(radionuclide)
+    limit_bq = DISPOSAL_LIMITS_BQ.get(radionuclide)
+    if limit_bq in (None,0):
+        ready_date = (start_date + timedelta(hours=float(half_life) * 10.0)).strftime(DATE_FORMAT)
+        return  ready_date, ready_date, None
     permitted = calc_date_below_limit(activity_mci, half_life, limit_bq, start_date)
     recommended = calc_date_below_limit(activity_mci, half_life, limit_bq * safety_factor, start_date)
     return recommended, permitted, float(limit_bq)
@@ -432,12 +434,16 @@ def ensure_daily_log_workbook(xlsx_path: str):
         wb = Workbook()
         ws0 = wb.active
         wb.remove(ws0)
-    if "Vials" not in wb.sheetnames:
-        ws = wb.create_sheet("Vials")
-        ws.append(["Disposal Date", "Disposal Time", "Radionuclide", "Calibration Date", "Stored At", "Activity(mCi)",
-                   "Permitted Date", "Recommended Date", "Limit(mCi)", "Limit(Bq)"])
-    if "Tc99m" not in wb.sheetnames:
-        wb.create_sheet("Tc99m")
+    vial_headers = ["Disposal Date", "Disposal Time", "Radionuclide", "Calibration Date", "Stored At", "Activity(mCi)",
+                   "Permitted Date", "Recommended Date", "Limit(mCi)", "Limit(Bq)"]
+    for sheet_name in ("Vials",) :
+        if sheet_name not in wb.sheetnames:
+            ws = wb.create_sheet(sheet_name)
+            ws.append(vial_headers)
+    for sheet_name in ("Tc99m", "Ga68", "Lu177"):
+        if sheet_name not in wb.sheetnames:
+            ws = wb.create_sheet(sheet_name)
+            ws.append(["Batch / Item Log"])
     wb.save(xlsx_path)
     return wb
 
@@ -457,6 +463,22 @@ def ensure_daily_log_sqlite():
                                                               limit_mci REAL,
                                                               limit_bq REAL)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS disposed_tc99m_batches (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                      batch_id INTEGER NOT NULL,
+                                                                      item_id TEXT NOT NULL,
+                                                                      stored_at TEXT NOT NULL,
+                                                                      activity_mci REAL NOT NULL,
+                                                                      permitted_date TEXT,
+                                                                      recommended_date TEXT,
+                                                                      limit_kbq_kg REAL)""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS disposed_ga68_batches (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                     batch_id INTEGER NOT NULL,
+                                                                     item_id TEXT NOT NULL,
+                                                                     stored_at TEXT NOT NULL,
+                                                                     activity_mci REAL NOT NULL,
+                                                                     permitted_date TEXT,
+                                                                     recommended_date TEXT,
+                                                                     limit_kbq_kg REAL)""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS disposed_lu177_batches (id INTEGER PRIMARY KEY AUTOINCREMENT,
                                                                       batch_id INTEGER NOT NULL,
                                                                       item_id TEXT NOT NULL,
                                                                       stored_at TEXT NOT NULL,
@@ -487,18 +509,19 @@ def log_vials_disposal(vials_full_rows):
     conn.commit()
     conn.close()
 
-def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_rows):
+def append_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_rows, radionuclide):
     conn = ensure_daily_log_sqlite()
     cur = conn.cursor()
     start_row = ws.max_row + 1
     if ws.max_row == 1 and ws.cell(1, 1).value is None:
         start_row = 1
+    limit_txt = DISPOSAL_LIMITS_KBQ_PER_KG.get(radionuclide, "-")
     title = f"BATCH: {batch_name} | Finalized: {finalized_at or '-'} | Disposed: {disposed_dt_str}"
     ws.cell(row=start_row, column=1, value=title)
     ws.cell(row=start_row, column=1).font = Font("bold")
     ws.cell(row=start_row, column=1).alignment = Alignment(horizontal="left")
     ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=9)
-    ws.cell(row=start_row + 1, column=1, value=f"(radionuclide={TC99M_NUCLIDE}, limit(kBq/kg)={DISPOSAL_LIMITS_KBQ_PER_KG[TC99M_NUCLIDE]})")
+    ws.cell(row=start_row + 1, column=1, value=f"(radionuclide={radionuclide}, limit(kBq/kg)={limit_txt})")
     ws.cell(row=start_row + 1, column=1).alignment = Alignment(horizontal="left")
     ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 1, end_column=9)
     headers = ["ID", "Stored At", "Activity(mCi)", "Permitted Date", "Recommended Date"]
@@ -517,7 +540,7 @@ def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_r
         ws.cell(row=r, column=5, value=recommended)
         r += 1
     ws.append([])
-    widths = [8, 16, 12, 16, 16, 8]
+    widths = [12, 18, 18, 18, 18, 8]
     for i,w in enumerate(widths, start=1):
         col = get_column_letter(i)
         cw = ws.column_dimensions[col].width
@@ -525,20 +548,20 @@ def append_tc99m_batch(ws, *, batch_name, finalized_at, disposed_dt_str, items_r
             ws.column_dimensions[col].width = w
     for item in items_rows:
         iid, item_label, stored_at, activity_mci, permitted, recommended = item
-        cur.execute("INSERT INTO disposed_tc99m_batches (batch_id, item_id, stored_at, activity_mci, permitted_date, recommended_date, limit_kbq_kg)"
-                    "VALUES (?,?,?,?,?,?,?)", (batch_name, iid, stored_at, float(activity_mci), permitted, recommended, float(DISPOSAL_LIMITS_KBQ_PER_KG[TC99M_NUCLIDE])))
+        cur.execute(f"INSERT INTO disposed_{radionuclide.lower()}_batches (batch_id, item_id, stored_at, activity_mci, permitted_date, recommended_date, limit_kbq_kg)"
+                    "VALUES (?,?,?,?,?,?,?)", (batch_name, iid, stored_at, float(activity_mci), permitted, recommended, None if limit_txt in (None,"-") else float(limit_txt)))
     conn.commit()
     conn.close()
 
-def log_tc99m_batch_disposal(batch_path: str, finalized_at: str, items_rows):
+def log_batch_disposal(batch_path: str, finalized_at: str, items_rows, *, radionuclide):
     disp_date = datetime.now().strftime(DATE_FORMAT)
     disp_time = datetime.now().strftime(HOUR_FORMAT)
     disp_dt_str = f"{disp_date} {disp_time}"
     batch_name = os.path.basename(batch_path)
     xlsx_path = get_daily_disposal_excel_path(disp_date)
     wb = ensure_daily_log_workbook(xlsx_path)
-    ws = wb["Tc99m"]
-    append_tc99m_batch(ws, batch_name=batch_name, finalized_at=finalized_at, disposed_dt_str=disp_dt_str, items_rows=items_rows)
+    ws = wb[f"{radionuclide}"]
+    append_batch(ws, batch_name=batch_name, finalized_at=finalized_at, disposed_dt_str=disp_dt_str, items_rows=items_rows, radionuclide=radionuclide)
     wb.save(xlsx_path)
 
 #=====MARK VIAL AS DISPOSED=====
@@ -652,21 +675,23 @@ def delete_vials_by_ids(ids):
         pass
 
 #=====TC99M SQLITE CREATE TABLES=====
-def init_tc99m_registry():
-    ensure_dir(TC99M_DIR)
-    conn = sqlite3.connect(TC99M_REGISTRY_DB)
+def init_registry(base_dir, registry_db):
+    ensure_dir(base_dir)
+    conn = sqlite3.connect(registry_db)
     cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS batches (id INTEGER PRIMARY KEY AUTOINCREMENT, folder_path TEXT, created_at TEXT, finalized_at TEXT, disposed_at TEXT)""")
     cols = [r[1] for r in cur.execute("PRAGMA table_info(batches)").fetchall()]
     if "disposed_at" not in cols:
         cur.execute("ALTER TABLE batches ADD COLUMN disposed_at TEXT")
+    if "finalized_at" not in cols:
+        cur.execute("ALTER TABLE batches ADD COLUMN finalized_at TEXT")
     conn.commit()
     conn.close()
 
 #=====CREATE NEW BATCH=====
-def create_new_batch_folder():
-    init_tc99m_registry()
+def create_new_batch_folder(base_dir, registry_db):
+    init_registry(base_dir, registry_db)
     year = datetime.now().strftime("%Y")
     creation_date = datetime.now().strftime(DATE_FORMAT)
     year_dir = os.path.join(TC99M_DIR, year)
@@ -687,43 +712,43 @@ def create_new_batch_folder():
     return batch_path
 
 #=====GET ACTIVE BATCH (IF IT DOESN'T EXIST CREATE NEW)=====
-def get_active_batch():
-    init_tc99m_registry()
-    conn = sqlite3.connect(TC99M_REGISTRY_DB)
+def get_active_batch(base_dir, registry_db):
+    init_registry(base_dir, registry_db)
+    conn = sqlite3.connect(registry_db)
     cur = conn.cursor()
     row = cur.execute("SELECT value FROM settings WHERE key='active_batch'").fetchone()
     conn.close()
     if row and os.path.isdir(row[0]):
         return row[0]
-    return create_new_batch_folder()
+    return create_new_batch_folder(base_dir, registry_db)
 
 #=====FINALIZE CURRENT ACTIVE BATCH AND START NEW=====
-def finalize_active_batch():
-    init_tc99m_registry()
-    old_batch = get_active_batch()
+def finalize_active_batch(base_dir, registry_db):
+    init_registry(base_dir, registry_db)
+    old_batch = get_active_batch(base_dir, registry_db)
     finalized_date = datetime.now().strftime(DATE_FORMAT)
     conn = sqlite3.connect(TC99M_REGISTRY_DB)
     cur = conn.cursor()
     cur.execute("UPDATE batches SET finalized_at=? WHERE folder_path=?", (finalized_date, old_batch))
     conn.commit()
     conn.close()
-    new_batch = create_new_batch_folder()
+    new_batch = create_new_batch_folder(base_dir, registry_db)
     return old_batch, new_batch
 
 #=====DISPOSE BATCH=====
-def dispose_batch(batch_path):
-    init_tc99m_registry()
+def dispose_batch(batch_path, base_dir, registry_db):
+    init_registry(base_dir, registry_db)
     disposed_date = datetime.now().strftime(DATE_FORMAT)
-    conn = sqlite3.connect(TC99M_REGISTRY_DB)
+    conn = sqlite3.connect(registry_db)
     cur = conn.cursor()
     cur.execute("UPDATE batches SET disposed_at=? WHERE folder_path=? AND disposed_at IS NULL", (disposed_date, batch_path))
     conn.commit()
     conn.close()
 
 #=====READ BATCH DATE INFO=====
-def read_batch_info(batch_path):
-    init_tc99m_registry()
-    conn = sqlite3.connect(TC99M_REGISTRY_DB)
+def read_batch_info(batch_path, base_dir, registry_db):
+    init_registry(base_dir, registry_db)
+    conn = sqlite3.connect(registry_db)
     cur = conn.cursor()
     row = cur.execute("SELECT created_at, finalized_at, disposed_at FROM batches WHERE folder_path=?", (batch_path,)).fetchone()
     conn.close()
@@ -756,8 +781,8 @@ def init_storage_files(batch_path):
     return db_path, xlsx_path
 
 #=====STORE TC99M ITEM IN SQLITE+XLSX=====
-def store_tc99m_item(item_id, source_parent_id, item_label, kit_name, stored_at, activity_mci, permitted_date=None, recommended_date=None):
-    batch_path = get_active_batch()
+def store_item(item_id, source_parent_id, item_label, kit_name, stored_at, activity_mci, *, radionuclide, base_dir, registry_db, permitted_date=None, recommended_date=None):
+    batch_path = get_active_batch(base_dir, registry_db)
     db_path, xlsx_path = init_storage_files(batch_path)
     if permitted_date is None or recommended_date is None:
         recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE, activity_mci=float(activity_mci), stored_at=stored_at)
@@ -776,9 +801,9 @@ def store_tc99m_item(item_id, source_parent_id, item_label, kit_name, stored_at,
     return item_id, batch_path
 
 #=====READ ITEMS INFO=====
-def read_tc99m_items(batch_path=None):
+def read_items(batch_path=None, *, base_dir, registry_db):
     if batch_path is None:
-        batch_path = get_active_batch()
+        batch_path = get_active_batch(base_dir, registry_db)
     db_path = os.path.join(batch_path, "storage.sqlite")
     if not os.path.exists(db_path):
         return []
@@ -856,14 +881,17 @@ def sync_tc99m_elutions_for_disposal(dbfile):
             recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE,
                                                                                       activity_mci=remaining_activity,
                                                                                       stored_at=stored_at)
-            store_tc99m_item(item_id=item_id,
-                             source_parent_id=f"ELUTION-{elution_id}",
-                             item_label=item_label,
-                             kit_name="ELUTION",
-                             stored_at=stored_at,
-                             activity_mci=remaining_activity,
-                             permitted_date=permitted_date,
-                             recommended_date=recommended_date)
+            store_item(item_id=item_id,
+                       source_parent_id=f"ELUTION-{elution_id}",
+                       item_label=item_label,
+                       kit_name="ELUTION",
+                       stored_at=stored_at,
+                       activity_mci=remaining_activity,
+                       radionuclide=TC99M_NUCLIDE,
+                       base_dir=TC99M_DIR,
+                       registry_db=TC99M_REGISTRY_DB,
+                       permitted_date=permitted_date,
+                       recommended_date=recommended_date)
             cur.execute("UPDATE elutions SET stored_to_disposal = 1, stored_to_disposal_at = ?, disposal_item_id = ? WHERE id=?",
                         (datetime.now().strftime(DATE_FORMAT), item_id, elution_id))
             synced_count += 1
@@ -915,14 +943,17 @@ def sync_tc99m_kits_for_disposal(dbfile):
             recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE,
                                                                                       activity_mci=residual_activity,
                                                                                       stored_at=stored_at)
-            store_tc99m_item(item_id=item_id,
-                             source_parent_id=parent_id,
-                             item_label=item_label,
-                             kit_name=kit_name,
-                             stored_at=stored_at,
-                             activity_mci=residual_activity,
-                             permitted_date=permitted_date,
-                             recommended_date=recommended_date)
+            store_item(item_id=item_id,
+                       source_parent_id=parent_id,
+                       item_label=item_label,
+                       kit_name=kit_name,
+                       stored_at=stored_at,
+                       activity_mci=residual_activity,
+                       radionuclide=TC99M_NUCLIDE,
+                       base_dir=TC99M_DIR,
+                       registry_db=TC99M_REGISTRY_DB,
+                       permitted_date=permitted_date,
+                       recommended_date=recommended_date)
         cur.execute("UPDATE kits SET stored_to_disposal = 1, stored_to_disposal_at = ?, disposal_item_id = ? WHERE id=?",
                     (datetime.now().strftime(DATE_FORMAT), item_id, parent_id))
         synced_count += 1

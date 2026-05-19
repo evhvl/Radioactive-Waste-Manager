@@ -40,13 +40,13 @@ GEN_BUTTON_STYLE = {
 
 # =====Τ1/2=====
 T12_I131, T12_GE68 = 8.0207, 271.05 #days
-T12_TC99M, T12_MO99 = 6.015, 65.94 #hours
+T12_TC99M, T12_MO99, T12_LU177 = 6.015, 65.94, 159.5 #hours
 LAMBDA_MO = math.log(2) / T12_MO99
 LAMBDA_TC = math.log(2) / T12_TC99M
 T12_GA68 = 67.84 #minutes
 
 #=====Vials=====
-VIAL_DATA = [("51-Cr",664.86), ("59-Fe",1067.9), ("67-Ga",78.3), ("89-Sr",1212.7), ("90-Y",64.1), ("111-In",67.3),
+VIAL_DATA = [("51-Cr",664.86), ("59-Fe",1067.9), ("177-Lu",159.5), ("89-Sr",1212.7), ("90-Y",64.1), ("111-In",67.3),
              ("123-I",13.27), ("125-I",1425.6), ("131-I",192.5), ("153-Sm",46.5), ("186-Re",89.2), ("201-Tl",72.9)]
 
 #=====Disposal=====
@@ -59,13 +59,17 @@ VIALS_DB = os.path.join(VIALS_STORAGE_DIR, "storage.sqlite")
 VIALS_XLSX = os.path.join(VIALS_STORAGE_DIR, "storage.xlsx")
 TC99M_DIR = os.path.join(DISPOSAL_ROOT, "Tc99m")
 TC99M_REGISTRY_DB = os.path.join(TC99M_DIR, "registry.sqlite")
+GA68_DIR = os.path.join(DISPOSAL_ROOT, "Ga68")
+GA68_REGISTRY_DB = os.path.join(GA68_DIR, "registry.sqlite")
+LU177_DIR = os.path.join(DISPOSAL_ROOT, "Lu177")
+LU177_REGISTRY_DB = os.path.join(LU177_DIR, "registry.sqlite")
 DAILY_DISPOSALS_DIR = os.path.join(DISPOSALS_LOG_DIR, "Daily Disposals")
 DAILY_LOG_DB = os.path.join(DAILY_DISPOSALS_DIR, "daily_disposals.sqlite")
-TC99M_NUCLIDE = "Tc99m"
-DISPOSAL_LIMITS_BQ = {"51-Cr": 1e7, "59-Fe": 1e6, "67-Ga": None, "89-Sr": 1e6, "90-Y":  1e5, "111-In": 1e6, "123-I": 1e7,
-                      "125-I": 1e6, "131-I": 1e6, "153-Sm": 1e6, "186-Re": 1e6, "201-Tl": 1e6, "Tc99m": 1e7}
-DISPOSAL_LIMITS_KBQ_PER_KG = {"51-Cr": 100, "59-Fe": 1, "67-Ga": None, "89-Sr": 1000, "90-Y":  1000, "111-In": 10, "123-I": 100,
-                              "125-I": 100, "131-I": 10, "153-Sm": 100, "186-Re": 1000, "201-Tl": 100, "Tc99m": 100}
+TC99M_NUCLIDE, GA68_NUCLIDE, LU177_NUCLIDE = "Tc99m", "Ga68", "Lu-177"
+DISPOSAL_LIMITS_BQ = {"51-Cr": 1e7, "59-Fe": 1e6, "177-Lu": 1e7, "89-Sr": 1e6, "90-Y":  1e5, "111-In": 1e6, "123-I": 1e7,
+                      "125-I": 1e6, "131-I": 1e6, "153-Sm": 1e6, "186-Re": 1e6, "201-Tl": 1e6, "Tc99m": 1e7, "Ga68": None}
+DISPOSAL_LIMITS_KBQ_PER_KG = {"51-Cr": 100, "59-Fe": 1, "177-Lu": 100, "89-Sr": 1000, "90-Y":  1000, "111-In": 10, "123-I": 100,
+                              "125-I": 100, "131-I": 10, "153-Sm": 100, "186-Re": 1000, "201-Tl": 100, "Tc99m": 100, "Ga68": None}
 
 #=====Kits=====
 KIT_CONFIG = {

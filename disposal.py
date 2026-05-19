@@ -6,10 +6,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from functions import *
 
 #====VIALS DISPOSAL TAB=====
-def build_vials_disposal_tab(parent_tab, *, on_back=None):
+def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None, title="VIAL DISPOSAL (LIVE STORAGE)"):
     for w in parent_tab.winfo_children():
         w.destroy()
-    header = Label(parent_tab, text="VIALS DISPOSAL (LIVE STORAGE)", **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
+    header = Label(parent_tab, text=title, **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
     header.pack(pady=(10,5), fill="x")
     btns = Frame(parent_tab, bg=C4)
     btns.pack(pady=(10,15))
@@ -36,6 +36,10 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
     #Functions
     def load_live_storage():
         rows = read_stored_vials()
+        if only_radionuclide is not None:
+            rows = [r for r in rows if r[1] == only_radionuclide]
+        elif only_radionuclide is None:
+            rows = [r for r in rows if r[1] != "Lu-177"]
         tree.delete(*tree.get_children())
         summary_rows = []
         for r in rows:
@@ -270,12 +274,12 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
     auto_refresh()
     refresh()
 
-#=====TC99M DISPOSAL TAB=====
-def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
+#=====GEN DISPOSAL TAB=====
+def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nuclide_constant, half_life_hours, base_dir, registry_db, title):
     for w in parent_tab.winfo_children():
         w.destroy()
     state = {"batch_path": None, "read_only": False}
-    header = Label(parent_tab, text="TC99M DISPOSAL BATCH", **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
+    header = Label(parent_tab, text=title, **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
     header.pack(pady=(10,5), fill="x")
     frame = Frame(parent_tab, bg=C4)
     frame.pack(pady=5)
@@ -288,14 +292,14 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
     def dispose_current_batch():
         if not state["batch_path"]:
             return
-        created_at, finalized_at, disposed_at = read_batch_info(state["batch_path"])
+        created_at, finalized_at, disposed_at = read_batch_info(state["batch_path"], base_dir=base_dir, registry_db=registry_db)
         if finalized_at is None and not state["read_only"]:
             messagebox.showwarning("Warning", "This batch is not Finalized.")
             return
         if disposed_at is not None:
             messagebox.showinfo("Info", "This batch is already disposed.")
             return
-        rows = read_tc99m_items(state["batch_path"])
+        rows = read_items(state["batch_path"], base_dir=base_dir, registry_db=registry_db)
         if not rows:
             messagebox.showwarning("Warning", "No items in this batch.")
             return
@@ -318,25 +322,25 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
         total_activity_now_mci = 0.0
         for r in rows:
             iid, item_label, stored_at, activity_mci, permitted, recommended = r
-            a_now = activity_now(TC99M_NUCLIDE, stored_at, activity_mci)
+            a_now = activity_now(nuclide_constant, stored_at, activity_mci)
             total_activity_now_mci += float(a_now)
         total_activity_kbq = mci_to_kbq(total_activity_now_mci)
         concentration = total_activity_kbq / float(mass_kg)
-        limit_kbq_kg = DISPOSAL_LIMITS_KBQ_PER_KG[TC99M_NUCLIDE]
+        limit_kbq_kg = DISPOSAL_LIMITS_KBQ_PER_KG[nuclide_constant]
         fraction = concentration / float(limit_kbq_kg)
         if fraction >= 1.0:
             messagebox.showwarning("Not clearable", "This batch is not ready to be disposed.")
             return
         if not messagebox.askyesno("Dispose Batch", "Dispose this FINALIZED Batch?\nThis will be logged and the batch will be marked as disposed."):
             return
-        log_tc99m_batch_disposal(state["batch_path"], finalized_at, rows)
-        dispose_batch(state["batch_path"])
+        log_batch_disposal(state["batch_path"], finalized_at, rows, radionuclide=nuclide_constant)
+        dispose_batch(state["batch_path"], base_dir=base_dir, registry_db=registry_db)
         messagebox.showinfo("Disposed", "Batch marked as disposed.")
         refresh()
     def load_batch(batch_path, read_only=False):
         state["batch_path"] = batch_path
         state["read_only"] = read_only
-        rows = read_tc99m_items(batch_path)
+        rows = read_items(batch_path, base_dir=base_dir, registry_db=registry_db)
         batch_label.config(text=f"Viewing: {os.path.basename(batch_path)}")
         if read_only:
             mode_label.config(text="READ ONLY (Finalized/Old Batch)")
@@ -358,7 +362,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
             except Exception:
                 status = "STORED"
             try:
-                a_now = activity_now(TC99M_NUCLIDE, stored_at, activity_mci)
+                a_now = activity_now(nuclide_constant, stored_at, activity_mci)
             except Exception:
                 a_now = float(activity_mci)
             total_activity += float(a_now)
@@ -368,7 +372,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
         total_items = len(rows)
         all_ready = total_items > 0 and ready_count == total_items
         summary_label.config(text=f"Total vials: {total_items}   |   Total activity Now: {total_activity} mCi   |   READY: {ready_count}")
-        created_at, finalized_at, disposed_at = read_batch_info(batch_path)
+        created_at, finalized_at, disposed_at = read_batch_info(batch_path, base_dir=base_dir, registry_db=registry_db)
         if disposed_at is not None:
             mode_label.config(text=f"DISPOSED on {disposed_at}", fg="red")
         elif read_only:
@@ -399,7 +403,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
             return
         load_batch(state["batch_path"], read_only=state["read_only"])
     def load_active():
-        active = get_active_batch()
+        active = get_active_batch(base_dir=base_dir, registry_db=registry_db)
         load_batch(active, read_only=False)
     def open_old_batch():
         folder = filedialog.askdirectory(title="Select Old (Finalized) Batch Folder", initialdir=TC99M_DIR)
@@ -411,7 +415,7 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
             return
         if not messagebox.askyesno("Finalize Batch", "Are you sure you want to finalize this ACTIVE batch?\nAfter finalize, new stored items will go into a NEW BATCH."):
             return
-        old_batch, new_batch = finalize_active_batch()
+        old_batch, new_batch = finalize_active_batch(base_dir=base_dir, registry_db=registry_db)
         messagebox.showinfo("Batch Finalized", f"Old batch closed:\n{os.path.basename(old_batch)}\n\nNew active batch:\n\n{os.path.basename(new_batch)}")
         load_batch(new_batch, read_only=True)
     btns = Frame(parent_tab, bg=C4)
@@ -448,3 +452,36 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
         parent_tab.after(600000, auto_refresh)
     auto_refresh()
     load_active()
+
+#=====GA68 DISPOSAL TAB=====
+def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
+    return build_generator_disposal_tab(parent_tab,
+                                        on_back=on_back,
+                                        nuclide_name="Tc99m",
+                                        nuclide_constant=TC99M_NUCLIDE,
+                                        half_life_hours=T12_TC99M,
+                                        base_dir=TC99M_DIR,
+                                        registry_db=TC99M_REGISTRY_DB,
+                                        title="TC99M DISPOSAL BATCH")
+
+#=====GA68 DISPOSAL TAB=====
+def build_ga68_disposal_tab(parent_tab, *, on_back=None):
+    return build_generator_disposal_tab(parent_tab,
+                                        on_back=on_back,
+                                        nuclide_name="Ga68",
+                                        nuclide_constant=GA68_NUCLIDE,
+                                        half_life_hours=T12_GA68,
+                                        base_dir=GA68_DIR,
+                                        registry_db=GA68_REGISTRY_DB,
+                                        title="GA68 DISPOSAL BATCH")
+
+#=====LU1177 DISPOSAL TAB=====
+def build_lu177_disposal_tab(parent_tab, *, on_back=None):
+    return build_generator_disposal_tab(parent_tab,
+                                        on_back=on_back,
+                                        nuclide_name="Lu177",
+                                        nuclide_constant=LU177_NUCLIDE,
+                                        half_life_hours=T12_LU177,
+                                        base_dir=LU177_DIR,
+                                        registry_db=LU177_REGISTRY_DB,
+                                        title="LU177 DISPOSAL BATCH")
