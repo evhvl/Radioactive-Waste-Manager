@@ -813,7 +813,7 @@ def read_items(batch_path=None, *, base_dir, registry_db):
     conn.close()
     return rows
 
-#====SYNC TC99M GEN FOR DISPOSAL=====
+#====SYNC TC99M+GA68 GEN FOR DISPOSAL=====
 def ensure_elutions_disposal_columns(cur, conn):
     cols = [r[1] for r in cur.execute("PRAGMA table_info(elutions)").fetchall()]
     if "stored_to_disposal" not in cols:
@@ -966,3 +966,129 @@ def sync_tc99m_gen_for_disposal(dbfile):
     elutions_count = sync_tc99m_elutions_for_disposal(dbfile)
     return kits_count, elutions_count
 
+def ensure_dotatoc_disposal_columns(cur, conn):
+    cols = [r[1] for r in cur.execute("PRAGMA table_info(dotatoc)").fetchall()]
+    if "stored_to_disposal" not in cols:
+        cur.execute("ALTER TABLE dotatoc ADD COLUMN stored_to_disposal INTEGER DEFAULT 0")
+    if "stored_to_disposal_at" not in cols:
+        cur.execute("ALTER TABLE dotatoc ADD COLUMN stored_to_disposal_at TEXT")
+    if "disposal_item_id" not in cols:
+        cur.execute("ALTER TABLE dotatoc ADD COLUMN disposal_item_id TEXT")
+    conn.commit()
+
+def sync_ga68_elutions_for_disposal(dbfile):
+    conn = sqlite3.connect(dbfile)
+    cur = conn.cursor()
+    ensure_elutions_disposal_columns(cur, conn)
+    today = datetime.now().date()
+    elution_rows = cur.execute(
+        "SELECT id, date, time, activity "
+        "FROM elutions "
+        "WHERE COALESCE(stored_to_disposal, 0) = 0 "
+        "ORDER BY date, time").fetchall()
+    synced_count = 0
+    for elution_id, date_str, time_str, activity in elution_rows:
+        try:
+            elution_date = datetime.strptime(date_str, DATE_FORMAT).date()
+        except ValueError:
+            continue
+        if elution_date >= today:
+            continue
+        initial_activity = float(activity or 0)
+        dotatoc_rows = cur.execute(
+            "SELECT admin_time, dose "
+            "FROM dotatoc "
+            "WHERE date=? "
+            "ORDER BY admin_time",
+            (date_str,)).fetchall()
+        used_activity = 0.0
+        last_use_time = time_str
+        for admin_time, dose in dotatoc_rows:
+            used_activity += float(dose or 0)
+            if admin_time:
+                last_use_time = admin_time
+        remaining_activity_at_elution = initial_activity - used_activity
+        if remaining_activity_at_elution < 0:
+            remaining_activity_at_elution = 0.0
+        try:
+            elution_dt = datetime.strptime(f"{date_str} {time_str}", f"{DATE_FORMAT} {HOUR_FORMAT}")
+            last_use_dt = datetime.strptime(f"{date_str} {last_use_time}", f"{DATE_FORMAT} {HOUR_FORMAT}")
+            delta_minutes = (last_use_dt - elution_dt).total_seconds() / 60.0
+            if delta_minutes < 0:
+                delta_minutes = 0.0
+            decay_factor = math.exp(-(math.log(2) / T12_GA68) * delta_minutes)
+            remaining_activity = round(remaining_activity_at_elution * decay_factor, 6)
+        except Exception:
+            remaining_activity = round(remaining_activity_at_elution, 6)
+        stored_at = date_str
+        item_id = f"Ga68-Elution-{elution_id}"
+        item_label = f"Elution-{time_str}"
+        if remaining_activity > 0:
+            recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide="Ga68",
+                                                                                      activity_mci=remaining_activity,
+                                                                                      stored_at=stored_at)
+            store_item(item_id=item_id,
+                       source_parent_id=f"GA68-ELUTION-{elution_id}",
+                       item_label=item_label,
+                       kit_name="ELUTION",
+                       stored_at=stored_at,
+                       activity_mci=remaining_activity,
+                       radionuclide="Ga68",
+                       base_dir=GA68_DIR,
+                       registry_db=GA68_REGISTRY_DB,
+                       permitted_date=permitted_date,
+                       recommended_date=recommended_date)
+        cur.execute("UPDATE elutions SET stored_to_disposal=1, stored_to_disposal_at=?, disposal_item_id=? WHERE id=?",
+                    (datetime.now().strftime(DATE_FORMAT), item_id, elution_id))
+        synced_count += 1
+    conn.commit()
+    conn.close()
+    return synced_count
+
+def sync_ga68_dotatoc_for_disposal(dbfile):
+    conn = sqlite3.connect(dbfile)
+    cur = conn.cursor()
+    ensure_dotatoc_disposal_columns(cur, conn)
+    today = datetime.now().date()
+    rows = cur.execute(
+        "SELECT id, date, patient, admin_time, residual "
+        "FROM dotatoc "
+        "WHERE COALESCE(stored_to_disposal, 0) = 0 "
+        "ORDER BY date, admin_time").fetchall()
+    synced_count = 0
+    for row_id, date_str, patient, admin_time, residual in rows:
+        try:
+            d = datetime.strptime(date_str, DATE_FORMAT).date()
+        except ValueError:
+            continue
+        if d >= today:
+            continue
+        residual_activity = float(residual or 0)
+        item_id = f"Ga68-DOTATOC-{row_id}"
+        item_label = f"DOTATOC-{patient}-{admin_time}"
+        if residual_activity > 0:
+            recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide="Ga68",
+                                                                                      activity_mci=residual_activity,
+                                                                                      stored_at=date_str)
+            store_item(item_id=item_id,
+                       source_parent_id=f"DOTATOC-{row_id}",
+                       item_label=item_label,
+                       kit_name="DOTATOC",
+                       stored_at=date_str,
+                       activity_mci=residual_activity,
+                       radionuclide="Ga68",
+                       base_dir=GA68_DIR,
+                       registry_db=GA68_REGISTRY_DB,
+                       permitted_date=permitted_date,
+                       recommended_date=recommended_date)
+        cur.execute("UPDATE dotatoc SET stored_to_disposal=1, stored_to_disposal_at=?, disposal_item_id=? WHERE id=?",
+                    (datetime.now().strftime(DATE_FORMAT), item_id, row_id))
+        synced_count += 1
+    conn.commit()
+    conn.close()
+    return synced_count
+
+def sync_ga68_gen_for_disposal(dbfile):
+    elutions_count = sync_ga68_elutions_for_disposal(dbfile)
+    dotatoc_count = sync_ga68_dotatoc_for_disposal(dbfile)
+    return dotatoc_count, elutions_count
