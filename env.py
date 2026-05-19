@@ -54,7 +54,9 @@ i131_button = Button(button_frame, text="I-131", **BUTTON_STYLE, command=lambda:
 i131_button.grid(column=0, row=2, padx=5, pady=5, sticky="w")
 disposal_button = Button(button_frame, text="DISPOSAL", **BUTTON_STYLE, command=lambda:func.create_new_tab("Disposal"))
 disposal_button.grid(column=0, row=3, padx=5, pady=5, sticky="w")
+copyright_label = Label(button_frame, text="© 2026 Evdokia Vlachou", font=("Segoe UI", 8), fg="gray", bg=BG, highlightthickness=0)
+copyright_label.grid(column=0, row=5, pady=(0, 5))
 exit_button = Button(button_frame, text="Exit", **{k:v for k,v in BUTTON_STYLE.items() if k not in ['width','height']}, width=12, height=1, command=quit)
-exit_button.grid(column=0, row=5, padx=0, pady=0, sticky="s")
+exit_button.grid(column=0, row=6, padx=0, pady=0, sticky="s")
 
 window.mainloop()

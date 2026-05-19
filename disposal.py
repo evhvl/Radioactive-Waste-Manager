@@ -130,11 +130,10 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
                 "limit_kbq_kg": d["limit_kbq_kg"],
                 "concentration_kbq_kg": d["concentration_kbq_kg"],
                 "fraction": d["fraction"],
-                "total_now": round(d["activity_now_mci"], 2),
+                "total_now": round(d["activity_now_mci"], 6),
                 "items": d["items"],
             }
             eligible[nucl]["items"].sort(key=lambda x: (str(x["cal_date"]), x["id"]))
-        messagebox.showinfo("Clearance passed", "Clearance passed")
         popup = Toplevel(parent_tab)
         popup.title("Eligible READY Vials (Table A clearance passed)")
         Label(popup, text="Select radionuclides to dispose", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(
@@ -161,7 +160,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
         for nucl, g in sorted(eligible.items(), key=lambda kv: kv[0]):
             t_groups.insert("", "end", iid=nucl,
                             values=(nucl,
-                                    f"{g['total_now']:.2f}",
+                                    f"{g['total_now']:.6f}",
                                     f"{g['concentration_kbq_kg']:.4f}",
                                     f"{g['limit_kbq_kg']:.4f}",
                                     f"{g['fraction']:.4f}",
@@ -177,7 +176,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
                     continue
                 for it in g["items"]:
                     t_det.insert("", "end", values=(it["id"], it["radionuclide"], it["cal_date"], it["stored_at"],
-                                                    f"{it['activity0']:.2f}", f"{it['activity_now']:.2f}", it["permitted"]))
+                                                    f"{it['activity0']:.2f}", f"{it['activity_now']:.6f}", it["permitted"]))
         t_groups.bind("<<TreeviewSelect>>", refresh_details)
         t_groups.selection_set(t_groups.get_children())
         refresh_details()
@@ -199,7 +198,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None):
                     if not g:
                         continue
                     lim_txt = "-" if g["limit_mci"] is None else f"{g['limit_mci']:.2f} mCi"
-                    story.append(Paragraph(f"{nucl} | Total Activity Now (mCi): {g['total_now']:.2f} mCi | Limit: {lim_txt} | Count: {len(g['items'])}",
+                    story.append(Paragraph(f"{nucl} | Total Activity Now (mCi): {g['total_now']:.6f} mCi | Limit: {lim_txt} | Count: {len(g['items'])}",
                                             styles["Heading2"]))
                     story.append(Spacer(1, 6))
                     data = [["Cal Date", "Stored at", "A0 (mCi)", "Activity Now (mCi)", "Permitted"]]
@@ -362,9 +361,10 @@ def build_tc99m_disposal_tab(parent_tab, *, on_back=None):
                 a_now = activity_now(TC99M_NUCLIDE, stored_at, activity_mci)
             except Exception:
                 a_now = float(activity_mci)
+            total_activity += float(a_now)
             if status == "READY":
                 ready_count += 1
-        total_activity = round(total_activity, 2)
+        total_activity = round(total_activity, 6)
         total_items = len(rows)
         all_ready = total_items > 0 and ready_count == total_items
         summary_label.config(text=f"Total vials: {total_items}   |   Total activity Now: {total_activity} mCi   |   READY: {ready_count}")

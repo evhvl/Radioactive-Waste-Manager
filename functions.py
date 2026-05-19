@@ -403,7 +403,7 @@ def disposal_summary(rows):
         recommended = r[6]
         if disposal_status(recommended, permitted) == "READY":
             ready_count += 1
-    return total_vials, round(total_activity_now, 2), ready_count
+    return total_vials, round(total_activity_now, 6), ready_count
 
 #=====DAILY LOG EXCEL+SQLite (COMMON)=====
 def get_disposed_by_date_dir(for_date: Optional[datetime] = None) -> str:
@@ -828,10 +828,7 @@ def sync_tc99m_elutions_for_disposal(dbfile):
             continue
         volume = float(volume or 0)
         concentration = float(concentration or 0)
-        kit_rows = cur.execute("SELECT time, volume"
-                               "FROM kits"
-                               "WHERE parent_id IS NULL AND date=? AND elution=?"
-                               "ORDER BY time",
+        kit_rows = cur.execute("SELECT time, volume FROM kits WHERE parent_id IS NULL AND date=? AND elution=? ORDER BY time",
                                (date_str, time_str)).fetchall()
         used_volume = 0.0
         last_labeling_time = time_str
@@ -851,7 +848,7 @@ def sync_tc99m_elutions_for_disposal(dbfile):
             decayed_conc = decay_activity(concentration, T12_TC99M, delta_hours)
         except Exception:
             decayed_conc = concentration
-        remaining_activity = round(remaining_volume * decayed_conc, 2)
+        remaining_activity = round(remaining_volume * decayed_conc, 6)
         stored_at = date_str
         item_id = f"Elution-{time_str}"
         item_label = f"Elution-{time_str}"
@@ -879,11 +876,7 @@ def sync_tc99m_kits_for_disposal(dbfile):
     cur = conn.cursor()
     ensure_kits_disposal_columns(cur, conn)
     today = datetime.now().date()
-    rows = cur.execute("SELECT id, date, time, kit, concentration, volume_left "
-                       "FROM kits "
-                       "WHERE parent_id IS NULL "
-                       "AND COALESCE(stored_to_disposal, 0) = 0 "
-                       "ORDER BY date, time").fetchall()
+    rows = cur.execute("SELECT id, date, time, kit, concentration, volume_left FROM kits WHERE parent_id IS NULL AND COALESCE(stored_to_disposal, 0) = 0 ORDER BY date, time").fetchall()
     synced_count = 0
     for parent_id, kit_date_str, kit_time_str, kit_name, concentration, volume_left in rows:
         try:
@@ -892,12 +885,32 @@ def sync_tc99m_kits_for_disposal(dbfile):
             continue
         if kit_date >= today:
             continue
-        concentration = float(concentration or 0)
-        volume_left = float(volume_left or 0)
-        residual_activity = round(concentration * volume_left, 2)
+        parent_concentration = float(concentration or 0)
+        parent_volume_left = float(volume_left or 0)
+        child_rows = cur.execute("SELECT time, dose_volume FROM kits WHERE parent_id=? ORDER BY time",
+                                 (parent_id,)).fetchall()
+        used_volume = 0.0
+        last_child_time = kit_time_str
+        for child_time, child_dose_volume in child_rows:
+            used_volume += float(child_dose_volume or 0)
+            if child_time:
+                last_child_time = child_time
+        remaining_volume = round(parent_volume_left - used_volume, 2)
+        if remaining_volume < 0:
+            remaining_volume = 0.0
+        try:
+            parent_dt = datetime.strptime(f"{kit_date_str} {kit_time_str}", f"{DATE_FORMAT} {HOUR_FORMAT}")
+            last_child_dt = datetime.strptime(f"{kit_date_str} {last_child_time}", f"{DATE_FORMAT} {HOUR_FORMAT}")
+            delta_hours = (last_child_dt - parent_dt).total_seconds() / 3600
+            if delta_hours < 0:
+                delta_hours = 0.0
+            decayed_conc = decay_activity(parent_concentration, T12_TC99M, delta_hours)
+        except Exception:
+            decayed_conc = parent_concentration
+        residual_activity = round(remaining_volume * decayed_conc, 6)
         stored_at = kit_date_str
-        item_id = f"{kit_name}"
-        item_label = f"{kit_name}"
+        item_id = f"{kit_name}-{parent_id}"
+        item_label = f"{kit_name}-{parent_id}"
         if residual_activity > 0:
             recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE,
                                                                                       activity_mci=residual_activity,
