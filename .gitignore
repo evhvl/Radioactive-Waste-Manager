@@ -1,9 +1,12 @@
+./build
+./dist
 .venv/
 env/
 .idea/
 .vscode/
 __pycache__/
 *.pyc
+*.spec
 *.pyo
 *.pyd
 *.db

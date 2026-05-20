@@ -1,8 +1,16 @@
 from tkinter import *
 from tkinter import ttk
-import functions
+import functions, os, sys
 from main import Tabs
 from constants import *
+
+def resource_path(relative_path):
+    if getattr(sys, "frozen", False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 # =====Create Window=====
 window = Tk()
@@ -38,7 +46,7 @@ main_tab = Frame(tabs_frame, bg=BG)
 tabs_frame.add(main_tab, text="Main Menu")
 
 canvas = Canvas(main_tab, width=1500, height=800, bg=BG, highlightthickness=0)
-test_img = PhotoImage(file="white_bg_radioactive.png").zoom(2,2)
+test_img = PhotoImage(file=resource_path("white_bg_radioactive.png")).zoom(2,2)
 canvas.create_image(550,690, image=test_img)
 main_text = canvas.create_text(200,50,text="MAIN MENU", font=(FONT_NAME,32,"bold"), fill="white")
 canvas.pack()
@@ -56,7 +64,7 @@ disposal_button = Button(button_frame, text="DISPOSAL", **BUTTON_STYLE, command=
 disposal_button.grid(column=0, row=3, padx=5, pady=5, sticky="w")
 copyright_label = Label(button_frame, text="© 2026 Evdokia Vlachou", font=("Segoe UI", 8), fg="gray", bg=BG, highlightthickness=0)
 copyright_label.grid(column=0, row=5, pady=(0, 5))
-exit_button = Button(button_frame, text="Exit", **{k:v for k,v in BUTTON_STYLE.items() if k not in ['width','height']}, width=12, height=1, command=quit)
+exit_button = Button(button_frame, text="Exit", **{k:v for k,v in BUTTON_STYLE.items() if k not in ['width','height']}, width=12, height=1, command=window.destroy)
 exit_button.grid(column=0, row=6, padx=0, pady=0, sticky="s")
 
 window.mainloop()
