@@ -157,6 +157,7 @@ def build_tab(app, tab):
 
     # Load Selected Generator
     def load_generator(dbfile):
+        sync_ga68_gen_for_disposal(dbfile)
         for widget in tab.winfo_children():
             widget.destroy()
         conn = sqlite3.connect(dbfile)

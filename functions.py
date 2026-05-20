@@ -946,8 +946,8 @@ def sync_tc99m_kits_for_disposal(dbfile):
             decayed_conc = parent_concentration
         residual_activity = round(remaining_volume * decayed_conc, 6)
         stored_at = kit_date_str
-        item_id = f"{kit_name}-{parent_id}"
-        item_label = f"{kit_name}-{parent_id}"
+        item_id = f"{kit_name}-{kit_time_str}"
+        item_label = f"{kit_name}-{kit_time_str}"
         if residual_activity > 0:
             recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE,
                                                                                       activity_mci=residual_activity,
@@ -1030,7 +1030,7 @@ def sync_ga68_elutions_for_disposal(dbfile):
         except Exception:
             remaining_activity = round(remaining_activity_at_elution, 6)
         stored_at = date_str
-        item_id = f"Ga68-Elution-{elution_id}"
+        item_id = f"Ga68-Elution-{time_str}"
         item_label = f"Elution-{time_str}"
         if remaining_activity > 0:
             recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide="Ga68",
@@ -1074,7 +1074,7 @@ def sync_ga68_dotatoc_for_disposal(dbfile):
             continue
         residual_activity = float(residual or 0)
         item_id = f"Ga68-DOTATOC-{row_id}"
-        item_label = f"DOTATOC-{patient}-{admin_time}"
+        item_label = f"DOTATOC-{admin_time}"
         if residual_activity > 0:
             recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide="Ga68",
                                                                                       activity_mci=residual_activity,

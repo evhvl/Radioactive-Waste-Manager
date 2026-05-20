@@ -293,7 +293,7 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         if not state["batch_path"]:
             return
         created_at, finalized_at, disposed_at = read_batch_info(state["batch_path"], base_dir=base_dir, registry_db=registry_db)
-        if finalized_at is None and not state["read_only"]:
+        if nuclide_name != "Ga68" and finalized_at is None and not state["read_only"]:
             messagebox.showwarning("Warning", "This batch is not Finalized.")
             return
         if disposed_at is not None:
@@ -314,6 +314,14 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
                 ready_count += 1
         if ready_count != len(rows):
             messagebox.showwarning("Not READY", f"All items must be READY before disposal.\n\nREADY: {ready_count}/{len(rows)}")
+            return
+        if nuclide_name == "Ga68":
+            if not messagebox.askyesno("Dispose Ga68 Batch", "Are you sure you want to dispose this Ga68 batch?\n\nNo table A kBq/kg limit is used for Ga68.\nThis action cannot be undone."):
+                return
+            log_batch_disposal(state["batch_path"], finalized_at, rows, radionuclide=nuclide_name)
+            dispose_batch(state["batch_path"], base_dir, registry_db)
+            messagebox.showinfo("Batch Disposed", "This Ga68 Batch is marked as disposed.")
+            refresh()
             return
         mass_kg = simpledialog.askfloat("Bag Mass", "Enter total bag mass in kg:", parent=parent_tab, minvalue=0.0001)
         if mass_kg is None or mass_kg <= 0:
@@ -351,7 +359,8 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         for r in rows:
             iid, item_label, stored_at, activity_mci, permitted, recommended = r
             status = disposal_status(recommended, permitted)
-            tree.insert("", "end", iid=str(iid), values=[item_label, stored_at, float(activity_mci), permitted, recommended, status], tags=(status,))
+            rounded_activity = round(float(activity_mci), 2)
+            tree.insert("", "end", iid=str(iid), values=[item_label, stored_at, rounded_activity, permitted, recommended, status], tags=(status,))
             summary_rows.append((iid, TC99M_NUCLIDE, None, stored_at, float(activity_mci), permitted, recommended, None))
         total_activity = 0.0
         ready_count = 0
@@ -383,7 +392,10 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         else:
             mode_label.config(text="ACTIVE BATCH", fg="orange")
         if not read_only:
-            action_btn.config(text="✗Finalize Batch✗", command=finalize_batch, state="normal")
+            if nuclide_name == "Ga68":
+                action_btn.config(text="✗Dispose Batch✗", command=dispose_current_batch, state="normal" if total_items > 0 and all_ready else "disabled")
+            else:
+                action_btn.config(text="✗Finalize Batch✗", command=finalize_batch, state="normal")
             return
         if read_only and disposed_at is None and all_ready:
             action_btn.config(text="✗Dispose Batch✗",
@@ -406,7 +418,7 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         active = get_active_batch(base_dir=base_dir, registry_db=registry_db)
         load_batch(active, read_only=False)
     def open_old_batch():
-        folder = filedialog.askdirectory(title="Select Old (Finalized) Batch Folder", initialdir=TC99M_DIR)
+        folder = filedialog.askdirectory(title="Select Old (Finalized) Batch Folder", initialdir=base_dir)
         if not folder:
             return
         load_batch(folder, read_only=True)
@@ -426,7 +438,7 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
     action_btn = Button(btns, text="✗Finalize Batch✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=16, height=1, font=(FONT_NAME, 12, "bold"), command=finalize_batch)
     action_btn.grid(row=0, column=3, padx=6)
     #Tree
-    columns = [("Item", 120), ("Stored at", 120), ("Activity (mCi)", 140), ("Permitted Date", 150), ("Recommended Date", 180), ("Status", 90),]
+    columns = [("Item", 160), ("Stored at", 120), ("Activity (mCi)", 140), ("Permitted Date", 150), ("Recommended Date", 180), ("Status", 90),]
     tree = ttk.Treeview(parent_tab, columns=[c[0] for c in columns], show="headings", height=15)
     tree.pack(pady=(10,0))
     for col_name, col_width in columns:
