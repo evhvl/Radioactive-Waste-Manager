@@ -318,10 +318,18 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         if nuclide_name == "Ga68":
             if not messagebox.askyesno("Dispose Ga68 Batch", "Are you sure you want to dispose this Ga68 batch?\n\nNo table A kBq/kg limit is used for Ga68.\nThis action cannot be undone."):
                 return
-            log_batch_disposal(state["batch_path"], finalized_at, rows, radionuclide=nuclide_name)
-            dispose_batch(state["batch_path"], base_dir, registry_db)
+            current_batch = state["batch_path"]
+            log_batch_disposal(current_batch, finalized_at, rows, radionuclide=nuclide_name)
+            dispose_batch(current_batch, base_dir, registry_db)
+            new_batch = create_new_batch_folder(base_dir, registry_db)
+            conn = sqlite3.connect(registry_db)
+            cur = conn.cursor()
+            cur.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_batch', ?)",
+                        (new_batch,))
+            conn.commit()
+            conn.close()
             messagebox.showinfo("Batch Disposed", "This Ga68 Batch is marked as disposed.")
-            refresh()
+            load_batch(new_batch, read_only=False)
             return
         mass_kg = simpledialog.askfloat("Bag Mass", "Enter total bag mass in kg:", parent=parent_tab, minvalue=0.0001)
         if mass_kg is None or mass_kg <= 0:
@@ -393,15 +401,23 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
             mode_label.config(text="ACTIVE BATCH", fg="orange")
         if not read_only:
             if nuclide_name == "Ga68":
-                action_btn.config(text="✗Dispose Batch✗", command=dispose_current_batch, state="normal" if total_items > 0 and all_ready else "disabled")
+                action_btn.config(text="✗Dispose Batch✗",
+                                  command=dispose_current_batch,
+                                  state="normal" if total_items > 0 and all_ready else "disabled")
             else:
-                action_btn.config(text="✗Finalize Batch✗", command=finalize_batch, state="normal")
+                action_btn.config(text="✗Finalize Batch✗",
+                                  command=finalize_batch,
+                                  state="normal")
             return
-        if read_only and disposed_at is None and all_ready:
+        if read_only and nuclide_name == "Ga68":
+            action_btn.config(text="✗Dispose Batch✗",
+                              command=dispose_current_batch,
+                              state="disabled")
+        if read_only and disposed_at is None and all_ready and nuclide_name != "Ga68":
             action_btn.config(text="✗Dispose Batch✗",
                               command=dispose_current_batch,
                               state="normal")
-        elif disposed_at is not None:
+        elif disposed_at is not None and nuclide_name != "Ga68":
             action_btn.config(text="✗Dispose Batch✗",
                               command=dispose_current_batch,
                               state="disabled")
