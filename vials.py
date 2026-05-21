@@ -87,11 +87,12 @@ def build_tab(app, tab, vial_name):
             cal_date = date_entry.get()
             cal_time = time_entry.get()
             exp_date = expiration_entry.get()
-            base_dir = "Vials"
+            base_dir = VIALS_DIR
             dt = datetime.strptime(cal_date, "%d-%m-%Y")
             year = dt.strftime("%Y")
             month = dt.strftime("%m")
             base_folder = os.path.join(base_dir, vial_name, year, month)
+            os.makedirs(base_folder, exist_ok=True)
             folder_name = f"{vial_name}__{cal_date}"
             vial_dir = os.path.join(base_folder, folder_name)
             if os.path.exists(vial_dir):
@@ -137,8 +138,8 @@ def build_tab(app, tab, vial_name):
         Label(popup, text=f"Select Existing {vial_name} Folder", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=10)
 
         def open_folder():
-            base_dir = Path(__file__).resolve().parent / "Vials"
-            initial_dir = find_last_folder(base_dir=base_dir, subfolder=vial_name)
+            vial_root = os.path.join(VIALS_DIR, vial_name)
+            initial_dir = find_last_folder(VIALS_DIR, vial_name)
             folder = filedialog.askdirectory(title="Select Vial Folder", initialdir=initial_dir)
             if not folder:
                 return

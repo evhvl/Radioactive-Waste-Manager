@@ -175,24 +175,30 @@ def renumber_children(conn, ws, tree, parent_iid):
 #Find Last Folder When Opening Old File
 def find_last_folder(base_dir, subfolder=None):
     root = os.path.join(base_dir, subfolder) if subfolder else base_dir
+    os.makedirs(root, exist_ok=True)
     now = datetime.now()
     preferred = os.path.join(root, now.strftime("%Y"), now.strftime("%m"))
     if os.path.exists(preferred):
         return preferred
-    latest_path = None
-    latest_time = 0
-    if os.path.exists(root):
-        for dirpath, dirnames, _ in os.walk(root):
-            for d in dirnames:
-                full_path = os.path.join(dirpath, d)
-                try:
-                    ctime = os.path.getctime(full_path)
-                except OSError:
-                    continue
-                if ctime > latest_time:
-                    latest_time = ctime
-                    latest_path = full_path
-    return latest_path or root
+    best_folder = None
+    best_distance = None
+    for year_name in os.listdir(root):
+        year_path = os.path.join(root, year_name)
+        if not os.path.isdir(year_path):
+            continue
+        for month_name in os.listdir(year_path):
+            month_path = os.path.join(year_path, month_name)
+            if not os.path.isdir(month_path):
+                continue
+            try:
+                folder_date = datetime.strptime(f"{year_name}-{month_name}", "%Y-%m")
+            except ValueError:
+                continue
+            distance = abs((folder_date - now).days)
+            if best_distance is None or distance < best_distance:
+                best_distance = distance
+                best_folder = month_path
+    return best_folder if best_folder else root
 
 #Store Gens
 def store_gen(*, conn, dbfile, excel_sheet="Gen Info", date_format=DATE_FORMAT, on_store_callback=None):

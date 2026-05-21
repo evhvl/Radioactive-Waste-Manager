@@ -89,7 +89,7 @@ def build_tab(app, tab):
             activity = values["Activity (MBq)"]
             start_date = start_date_entry.get()
             expiration_date = expiration_date_entry.get()
-            base_dir = "Ga68_Generators"
+            base_dir = GA68_GENERATORS_DIR
             dt = datetime.strptime(start_date, "%d-%m-%Y")
             year = dt.strftime("%Y")
             year_dir = os.path.join(base_dir, year)
@@ -130,9 +130,8 @@ def build_tab(app, tab):
         center_window(window=popup_window, w=420, h=160)
         Label(popup_window, text="Select Existing Generator Folder", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=10)
         def open_folder():
-            ga68_root = Path(__file__).resolve().parent / "Ga68_Generators"
-            initial_dir = max((p for p in ga68_root.rglob("*") if p.is_dir()), key=lambda p: p.stat().st_mtime).parent
-            folder = filedialog.askdirectory(title="Select Ga68 Generator Folder", initialdir=initial_dir)
+            initial_dir = find_last_folder(GA68_GENERATORS_DIR)
+            folder = filedialog.askdirectory(title="Select Ga68 Generator Folder", initialdir=str(initial_dir))
             if not folder:
                 return
             sqlite_files = [f for f in os.listdir(folder) if f.endswith(".sqlite")]

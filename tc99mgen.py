@@ -88,7 +88,7 @@ def build_tab(app, tab):
             cal_date = cal_date_entry.get()
             cal_time = cal_time_entry.get()
             expiration_date = expiration_date_entry.get()
-            base_dir = "Tc99m_Generators"
+            base_dir = TC99M_GENERATORS_DIR
             dt = datetime.strptime(start_date, "%d-%m-%Y")
             year = dt.strftime("%Y")
             month = dt.strftime("%m")
@@ -133,8 +133,7 @@ def build_tab(app, tab):
         Label(popup_window, text="Select Existing Generator Folder", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=10)
 
         def open_folder():
-            tc99m_root = Path(__file__).resolve().parent / "Tc99m_Generators"
-            initial_dir = max((p for p in tc99m_root.rglob("*") if p.is_dir()), key=lambda p: p.stat().st_mtime).parent
+            initial_dir = find_last_folder(TC99M_GENERATORS_DIR)
             folder = filedialog.askdirectory(title="Select Tc99m Generator Folder", initialdir=initial_dir)
             if not folder:
                 return

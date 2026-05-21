@@ -434,7 +434,8 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         active = get_active_batch(base_dir=base_dir, registry_db=registry_db)
         load_batch(active, read_only=False)
     def open_old_batch():
-        folder = filedialog.askdirectory(title="Select Old (Finalized) Batch Folder", initialdir=base_dir)
+        initial_dir = find_last_folder(base_dir)
+        folder = filedialog.askdirectory(title="Select Old (Finalized) Batch Folder", initialdir=initial_dir)
         if not folder:
             return
         load_batch(folder, read_only=True)

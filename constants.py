@@ -1,4 +1,9 @@
-import math, os
+import math, os, sys
+
+if getattr(sys, "frozen", False):
+    APP_DIR = os.path.dirname(sys.executable)
+else:
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 #=====Customization=====}
 C1, C2, C3, C4, BG, FONT_NAME = "#b2d8d8", "#66b2b2", "#008080", "#006666", "#004c4c", "Times"
@@ -45,6 +50,11 @@ LAMBDA_MO = math.log(2) / T12_MO99
 LAMBDA_TC = math.log(2) / T12_TC99M
 T12_GA68 = 67.84 #minutes
 
+#=====FILES=====
+GA68_GENERATORS_DIR = os.path.join(APP_DIR, "Ga68_Generators")
+TC99M_GENERATORS_DIR = os.path.join(APP_DIR, "Tc99m_Generators")
+VIALS_DIR = str(os.path.join(APP_DIR, "Vials"))
+
 #=====Vials=====
 VIAL_DATA = [("51-Cr",664.86), ("59-Fe",1067.9), ("177-Lu",159.5), ("89-Sr",1212.7), ("90-Y",64.1), ("111-In",67.3),
              ("123-I",13.27), ("125-I",1425.6), ("131-I",192.5), ("153-Sm",46.5), ("186-Re",89.2), ("201-Tl",72.9)]
@@ -52,7 +62,7 @@ VIAL_DATA = [("51-Cr",664.86), ("59-Fe",1067.9), ("177-Lu",159.5), ("89-Sr",1212
 #=====Disposal=====
 DATE_FORMAT = "%d-%m-%Y"
 HOUR_FORMAT = "%H:%M"
-DISPOSAL_ROOT = "Disposals"
+DISPOSAL_ROOT = os.path.join(APP_DIR, "Disposals")
 DISPOSALS_LOG_DIR = os.path.join(DISPOSAL_ROOT, "Logs")
 VIALS_STORAGE_DIR = os.path.join(DISPOSALS_LOG_DIR, "Vials")
 VIALS_DB = os.path.join(VIALS_STORAGE_DIR, "storage.sqlite")
