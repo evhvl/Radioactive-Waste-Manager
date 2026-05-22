@@ -330,10 +330,10 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         concentration = total_activity_kbq / float(mass_kg)
         limit_kbq_kg = DISPOSAL_LIMITS_KBQ_PER_KG[nuclide_constant]
         fraction = concentration / float(limit_kbq_kg)
-        if fraction >= 1.0:
-            messagebox.showwarning("Not clearable", "This batch is not ready to be disposed.")
+        if fraction >= limit_kbq_kg:
+            messagebox.showwarning("Not clearable", f"This batch is not ready to be disposed.\n\nCurrent kBq/kg: {fraction}\n\nLimit(kBq/kg): {limit_kbq_kg}")
             return
-        if not messagebox.askyesno("Dispose Batch", "Dispose this FINALIZED Batch?\nThis will be logged and the batch will be marked as disposed."):
+        if not messagebox.askyesno("Dispose Batch", f"Dispose this FINALIZED Batch?\n\nCurrent kBq/kg: {fraction}\n\nLimit(kBq/kg): {limit_kbq_kg}\n\nThis will be logged and the batch will be marked as disposed."):
             return
         log_batch_disposal(state["batch_path"], finalized_at, rows, radionuclide=nuclide_constant)
         dispose_batch(state["batch_path"], base_dir=base_dir, registry_db=registry_db)

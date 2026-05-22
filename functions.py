@@ -759,6 +759,13 @@ def dispose_batch(batch_path, base_dir, registry_db):
     cur.execute("UPDATE batches SET disposed_at=? WHERE folder_path=? AND disposed_at IS NULL", (disposed_date, batch_path))
     conn.commit()
     conn.close()
+    old_name = os.path.basename(batch_path)
+    if not old_name.endswith("-DISPOSED"):
+        new_name = f"{old_name}-DISPOSED"
+        new_path = os.path.join(os.path.dirname(batch_path), new_name)
+        os.rename(batch_path, new_path)
+        batch_path = new_path
+    return batch_path
 
 #=====READ BATCH DATE INFO=====
 def read_batch_info(batch_path, base_dir, registry_db):
