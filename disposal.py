@@ -59,19 +59,6 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
         summary_label.config(text=f"Total vials: {total_vials}   |   Total activity Now: {total_activity} mCi   |   READY: {ready_count}")
     def refresh():
         load_live_storage()
-    def dispose_selected_vials():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showerror("Error", "Select 1 or more vials to dispose.")
-            return
-        ids = [int(x) for x in sel]
-        if not messagebox.askyesno("Dispose Vials", f"Dispose selected vials: {len(ids)}?"):
-            return
-        full_rows =  read_vials_full_ids(ids)
-        log_vials_disposal(full_rows)
-        delete_vials_by_ids(ids)
-        refresh()
-        messagebox.showinfo("Disposed", f"Disposed {len(ids)} vials (logged to daily disposal file).")
     def check_ready_vials():
         rows = read_stored_vials()
         if not rows:
@@ -264,8 +251,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
             width=12, height=1, font=(FONT_NAME, 12, "bold"), command=refresh).grid(row=0, column=0, padx=6)
     Button(btns, text="Check READY", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
            width=14, height=1, font=(FONT_NAME, 12, "bold"), command=check_ready_vials).grid(row=0, column=1, padx=6)
-    Button(btns, text="✗Dispose Selected✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-            width=20, height=1, font=(FONT_NAME, 12, "bold"), command=dispose_selected_vials).grid(row=0, column=2, padx=6)
+    Button(btns, text="✗Dispose Selected✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']})
     if on_back:
         Button(parent_tab, text="Back", **TAB_BUTTON_STYLE, command=on_back).pack(pady=(0, 10))
     def auto_refresh():
