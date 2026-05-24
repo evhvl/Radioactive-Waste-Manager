@@ -67,7 +67,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
         today0 = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         ready_items = []
         for r in rows:
-            rid, radionuclide, cal_date, stored_at, activity0, permitted, recommended, limit_mci = r
+            rid, radionuclide, cal_date, stored_at, activity0, permitted, recommended, limit_mci, source_db = r
             if permitted is None:
                 continue
             if not isinstance(permitted, str):
@@ -91,7 +91,9 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
                                     "activity0": float(activity0),
                                     "activity_now": float(a_now),
                                     "permitted": permitted,
-                                    "limit_mci": None if limit_mci is None else float(limit_mci)})
+                                    "limit_mci": None if limit_mci is None else float(limit_mci),
+                                    "source_db": source_db,
+                                    "cal_activity": get_vial_cal_activity(source_db)})
         if not ready_items:
             messagebox.showinfo("Check READY", "No READY vials found today.")
             return
@@ -380,7 +382,7 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         total_activity = round(total_activity, 6)
         total_items = len(rows)
         all_ready = total_items > 0 and ready_count == total_items
-        summary_label.config(text=f"Total vials: {total_items}   |   Total activity Now: {total_activity} mCi   |   READY: {ready_count}")
+        summary_label.config(text=f"Total vials: {total_items}   |   Total activity Now: {total_activity:.6g} mCi   |   READY: {ready_count}")
         created_at, finalized_at, disposed_at = read_batch_info(batch_path, base_dir=base_dir, registry_db=registry_db)
         if disposed_at is not None:
             mode_label.config(text=f"DISPOSED on {disposed_at}", fg="red")

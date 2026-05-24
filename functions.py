@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 from openpyxl.styles import Alignment, Font
@@ -214,6 +215,7 @@ def store_gen(*, conn, dbfile, excel_sheet="Gen Info", date_format=DATE_FORMAT, 
     ws = wb[excel_sheet]
     ws.cell(row=2, column=7).value = stored_date
     wb.save(excel_path)
+    update_folder_status(folder, stored=True)
     messagebox.showinfo("Stored", f"Generator stored on {stored_date}.")
     if on_store_callback:
         on_store_callback()
@@ -233,6 +235,7 @@ def dispose_gen(*, conn, dbfile, excel_sheet="Gen Info", date_format="%d-%m-%Y",
     ws = wb[excel_sheet]
     ws.cell(row=2, column=6).value = disposal_date
     wb.save(excel_path)
+    update_folder_status(folder, disposed=True)
     messagebox.showinfo("Disposed", f"Generator disposed on {disposal_date}.")
     if on_disposed_callback:
         on_disposed_callback()
@@ -275,6 +278,28 @@ def get_float(value, default=None):
         return float(text)
     except (ValueError, TypeError):
         return default
+
+#=====MARK FOLDERS AS STORED/DISPOSED=====
+def update_folder_status(path, *, stored=False, disposed=False):
+    try:
+        if not os.path.exists(path):
+            return path
+        parent = os.path.dirname(path)
+        current_name = os.path.basename(path)
+        clean_name = current_name.replace("-ACTIVE", "").replace("-STORED", "").replace("-DISPOSED", "")
+        if disposed:
+            new_name = f"{clean_name}-DISPOSED"
+        elif stored:
+            new_name = f"{clean_name}-STORED"
+        else:
+            new_name = f"{clean_name}-ACTIVE"
+        new_path = os.path.join(parent, new_name)
+        if path != new_path and not os.path.exists(new_path):
+            os.rename(path, new_path)
+        return new_path
+    except Exception as e:
+        messagebox.showerror("Error", f"Folder rename error: {e}")
+        return path
 
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
@@ -650,7 +675,7 @@ def read_stored_vials():
     init_vials_storage()
     conn = sqlite3.connect(VIALS_DB)
     cur = conn.cursor()
-    rows = cur.execute("SELECT id, radionuclide, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_mci FROM stored_vials ORDER BY id").fetchall()
+    rows = cur.execute("SELECT id, radionuclide, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_mci, source_db FROM stored_vials ORDER BY id").fetchall()
     conn.close()
     return rows
 
@@ -664,21 +689,19 @@ def read_vials_full_ids(ids):
     placeholders = ",".join(["?"] * len(ids))
     rows = cur.execute(f"SELECT id, radionuclide, source_db, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_bq, limit_mci FROM stored_vials WHERE id IN ({placeholders}) ORDER BY id", ids).fetchall()
     conn.close()
-    enriched = []
-    for r in rows:
-        rid, radionuclide, source_db, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_bq, limit_mci = r
-        cal_activity = None
-        try:
-            src_conn = sqlite3.connect(source_db)
-            src_cur = src_conn.cursor()
-            src_row = src_cur.execute("SELECT activity FROM vial_info ORDER BY rowid DESC LIMIT 1").fetchone()
-            src_conn.close()
-            if src_row:
-                cal_activity = src_row[0]
-        except Exception:
-            cal_activity = None
-        enriched.append((rid, radionuclide, source_db, calibration_date, cal_activity, stored_at, activity_mci, permitted_date, recommended_date, limit_bq, limit_mci))
-    return enriched
+    return rows
+
+def get_vial_cal_activity(source_db):
+    try:
+        conn = sqlite3.connect(source_db)
+        cur = conn.cursor()
+        row = cur.execute("SELECT activity FROM vial_info ORDER BY rowid DESC LIMIT 1").fetchone()
+        conn.close()
+        if row and row[0] is not None:
+            return float(row[0])
+    except Exception:
+        pass
+    return None
 
 #=====DELETE VIALS BY IDS=====
 def delete_vials_by_ids(ids):
@@ -729,7 +752,7 @@ def create_new_batch_folder(base_dir, registry_db):
     creation_date = datetime.now().strftime(DATE_FORMAT)
     year_dir = os.path.join(base_dir, year)
     ensure_dir(year_dir)
-    batch_folder = f"Batch__{creation_date}"
+    batch_folder = f"Batch__{creation_date}-ACTIVE"
     batch_path = os.path.join(year_dir, batch_folder)
     if not os.path.exists(batch_path):
         ensure_dir(batch_path)
@@ -761,26 +784,21 @@ def finalize_active_batch(base_dir, registry_db):
     old_batch = get_active_batch(base_dir, registry_db)
     finalized_date = mark_items_finalized(old_batch)
     update_storage_excel_batch_column(old_batch, 7, finalized_date)
+    stored_batch = update_folder_status(old_batch, stored=True)
     conn = sqlite3.connect(registry_db)
     cur = conn.cursor()
-    cur.execute("UPDATE batches SET finalized_at=? WHERE folder_path=?", (finalized_date, old_batch))
+    cur.execute("UPDATE batches SET finalized_at=?, folder_path=? WHERE folder_path=?", (finalized_date, stored_batch, old_batch))
     conn.commit()
     conn.close()
     new_batch = create_new_batch_folder(base_dir, registry_db)
-    return old_batch, new_batch
+    return stored_batch, new_batch
 
 #=====DISPOSE BATCH=====
 def dispose_batch(batch_path, base_dir, registry_db):
     init_registry(base_dir, registry_db)
     disposed_date = mark_items_disposed(batch_path)
     update_storage_excel_batch_column(batch_path, 8, disposed_date)
-    new_path = batch_path
-    old_name = os.path.basename(batch_path)
-    if not old_name.endswith("-DISPOSED"):
-        new_name = f"{old_name}-DISPOSED"
-        new_path = os.path.join(os.path.dirname(batch_path), new_name)
-        if os.path.exists(batch_path) and not os.path.exists(new_path):
-            os.rename(batch_path, new_path)
+    new_path = update_folder_status(batch_path, disposed=True)
     conn = sqlite3.connect(registry_db)
     cur = conn.cursor()
     cur.execute("UPDATE batches SET disposed_at=?, folder_path=? WHERE folder_path=?", (disposed_date, new_path, batch_path))
