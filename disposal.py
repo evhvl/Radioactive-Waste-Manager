@@ -172,7 +172,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
         t_groups.selection_set(t_groups.get_children())
         refresh_details()
         # ---- PDF export ----
-        def export_pdf():
+        def export_pdf(selected_nuclides=None):
             try:
                 disp_date = datetime.now().strftime(DATE_FORMAT)
                 pdf_path = get_ready_vials_pdf_path(disp_date)
@@ -181,20 +181,24 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
                 story = []
                 story.append(Paragraph(f"READY Vials Eligible for Disposal - {disp_date}", styles["Title"]))
                 story.append(Spacer(1, 10))
-                sel = list(t_groups.selection())
+                story.append(Paragraph(f"Bag Mass: {float(mass_kg):.3f} kg", styles["Heading2"]))
+                story.append(Spacer(1,10))
+                sel = selected_nuclides or list(t_groups.selection())
                 if not sel:
                     sel = sorted(list(eligible.keys()))
                 for nucl in sel:
                     g = eligible.get(nucl)
                     if not g:
                         continue
-                    lim_txt = "-" if g["limit_mci"] is None else f"{g['limit_mci']:.2f} mCi"
-                    story.append(Paragraph(f"{nucl} | Total Activity Now (mCi): {g['total_now']:.6f} mCi | Limit: {lim_txt} | Count: {len(g['items'])}",
+                    lim_txt = f"{g['limit_kbq_kg']:.4f} kBq/kg"
+                    story.append(Paragraph(f"{nucl} | Total Activity Now (mCi): {g['total_now']:.6f} mCi | Limit: {lim_txt} | "
+                                           f"C(kBq/kg): {g['concentration_kbq_kg']:.4f} kBq/kg | Fraction: {g['fraction']:.4f} | Count: {len(g['items'])}",
                                             styles["Heading2"]))
                     story.append(Spacer(1, 6))
-                    data = [["Cal Date", "Stored at", "A0 (mCi)", "Activity Now (mCi)", "Permitted"]]
+                    data = [["Cal Date", "Cal Activity (mCi)", "Stored at", "A0 (mCi)", "Activity Now (mCi)", "Permitted"]]
                     for it in g["items"]:
                         data.append([str(it["cal_date"]),
+                                     "" if it.get("cal_activity") is None else f"{float(it['cal_activity']):.2f}",
                                      str(it["stored_at"]),
                                      f"{it['activity0']:.2f}",
                                      f"{it['activity_now']:.2f}",
@@ -207,10 +211,11 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
                     story.append(tbl)
                     story.append(Spacer(1, 14))
                 doc.build(story)
-                messagebox.showinfo("PDF Export", f"PDF created:\n{pdf_path}")
                 os.startfile(pdf_path)
+                return pdf_path
             except Exception as e:
                 messagebox.showerror("PDF Export Error", str(e))
+                return None
         def dispose_selected_groups():
             sel = list(t_groups.selection())
             if not sel:
@@ -226,6 +231,9 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
                 return
             if not messagebox.askyesno("Dispose", f"Dispose {len(ids)} vials from selected radionuclides?"):
                 return
+            pdf_path  = export_pdf(sel)
+            if pdf_path is None:
+                return
             full_rows = read_vials_full_ids(ids)
             log_vials_disposal(full_rows)
             delete_vials_by_ids(ids)
@@ -234,12 +242,10 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
             messagebox.showinfo("Disposed", f"Disposed {len(ids)} vials and logged them to sheet 'Vials'.")
         btn_row = Frame(popup, bg=C4)
         btn_row.pack(pady=(15, 0))
-        Button(btn_row, text="Print PDF", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=12, height=2, font=(FONT_NAME, 14, "bold"), command=export_pdf).grid(row=0, column=0, padx=6)
         Button(btn_row, text="OK", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=12, height=2, font=(FONT_NAME, 14, "bold"), command=dispose_selected_groups).grid(row=0, column=1, padx=6)
+               width=12, height=2, font=(FONT_NAME, 14, "bold"), command=dispose_selected_groups).grid(row=0, column=0, padx=6)
         Button(btn_row, text="Close", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
-               width=12, height=2, font=(FONT_NAME, 14, "bold"), command=popup.destroy).grid(row=0, column=2, padx=6)
+               width=12, height=2, font=(FONT_NAME, 14, "bold"), command=popup.destroy).grid(row=0, column=1, padx=6)
         popup.update_idletasks()
         width = popup.winfo_reqwidth() + 100
         height = popup.winfo_reqheight() + 40
@@ -251,7 +257,6 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
             width=12, height=1, font=(FONT_NAME, 12, "bold"), command=refresh).grid(row=0, column=0, padx=6)
     Button(btns, text="Check READY", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
            width=14, height=1, font=(FONT_NAME, 12, "bold"), command=check_ready_vials).grid(row=0, column=1, padx=6)
-    Button(btns, text="✗Dispose Selected✗", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']})
     if on_back:
         Button(parent_tab, text="Back", **TAB_BUTTON_STYLE, command=on_back).pack(pady=(0, 10))
     def auto_refresh():
@@ -306,7 +311,7 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
                 return
             current_batch = state["batch_path"]
             log_batch_disposal(current_batch, finalized_at, rows, radionuclide=nuclide_name)
-            dispose_batch(current_batch, base_dir, registry_db)
+            disposed_batch = dispose_batch(current_batch, base_dir, registry_db)
             new_batch = create_new_batch_folder(base_dir, registry_db)
             conn = sqlite3.connect(registry_db)
             cur = conn.cursor()
@@ -315,7 +320,7 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
             conn.commit()
             conn.close()
             messagebox.showinfo("Batch Disposed", "This Ga68 Batch is marked as disposed.")
-            load_batch(new_batch, read_only=False)
+            load_batch(disposed_batch, read_only=True)
             return
         mass_kg = simpledialog.askfloat("Bag Mass", "Enter total bag mass in kg:", parent=parent_tab, minvalue=0.0001)
         if mass_kg is None or mass_kg <= 0:
@@ -329,16 +334,17 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         total_activity_kbq = mci_to_kbq(total_activity_now_mci)
         concentration = total_activity_kbq / float(mass_kg)
         limit_kbq_kg = DISPOSAL_LIMITS_KBQ_PER_KG[nuclide_constant]
-        fraction = concentration / float(limit_kbq_kg)
-        if fraction >= limit_kbq_kg:
-            messagebox.showwarning("Not clearable", f"This batch is not ready to be disposed.\n\nCurrent kBq/kg: {fraction}\n\nLimit(kBq/kg): {limit_kbq_kg}")
+        if concentration >= limit_kbq_kg:
+            messagebox.showwarning("Not clearable", f"This batch is not ready to be disposed.\n\nCurrent kBq/kg: {concentration}\n\nLimit(kBq/kg): {limit_kbq_kg}")
             return
-        if not messagebox.askyesno("Dispose Batch", f"Dispose this FINALIZED Batch?\n\nCurrent kBq/kg: {fraction}\n\nLimit(kBq/kg): {limit_kbq_kg}\n\nThis will be logged and the batch will be marked as disposed."):
+        if not messagebox.askyesno("Dispose Batch", f"Dispose this FINALIZED Batch?\n\nCurrent kBq/kg: {concentration}\n\nLimit(kBq/kg): {limit_kbq_kg}\n\nThis will be logged and the batch will be marked as disposed."):
             return
-        log_batch_disposal(state["batch_path"], finalized_at, rows, radionuclide=nuclide_constant)
-        dispose_batch(state["batch_path"], base_dir=base_dir, registry_db=registry_db)
+        disposed_batch = dispose_batch(state["batch_path"], base_dir=base_dir, registry_db=registry_db)
+        created_at, finalized_at, disposed_at = read_batch_info(disposed_batch)
+        log_batch_disposal(disposed_batch, finalized_at, rows, radionuclide=nuclide_constant)
         messagebox.showinfo("Disposed", "Batch marked as disposed.")
         refresh()
+        load_batch(disposed_batch, read_only=True)
     def load_batch(batch_path, read_only=False):
         state["batch_path"] = batch_path
         state["read_only"] = read_only

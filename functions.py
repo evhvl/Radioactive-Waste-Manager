@@ -501,6 +501,10 @@ def ensure_daily_log_sqlite():
                                                                       permitted_date TEXT,
                                                                       recommended_date TEXT,
                                                                       limit_kbq_kg REAL)""")
+    for table in ("disposed_tc99m_batches", "disposed_ga68_batches", "disposed_lu177_batches"):
+        cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
+        if "limit_kbq_kg" not in cols:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN limit_kbq_kg REAL")
     conn.commit()
     return conn
 
@@ -660,7 +664,21 @@ def read_vials_full_ids(ids):
     placeholders = ",".join(["?"] * len(ids))
     rows = cur.execute(f"SELECT id, radionuclide, source_db, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_bq, limit_mci FROM stored_vials WHERE id IN ({placeholders}) ORDER BY id", ids).fetchall()
     conn.close()
-    return rows
+    enriched = []
+    for r in rows:
+        rid, radionuclide, source_db, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_bq, limit_mci = r
+        cal_activity = None
+        try:
+            src_conn = sqlite3.connect(source_db)
+            src_cur = src_conn.cursor()
+            src_row = src_cur.execute("SELECT activity FROM vial_info ORDER BY rowid DESC LIMIT 1").fetchone()
+            src_conn.close()
+            if src_row:
+                cal_activity = src_row[0]
+        except Exception:
+            cal_activity = None
+        enriched.append((rid, radionuclide, source_db, calibration_date, cal_activity, stored_at, activity_mci, permitted_date, recommended_date, limit_bq, limit_mci))
+    return enriched
 
 #=====DELETE VIALS BY IDS=====
 def delete_vials_by_ids(ids):
@@ -741,7 +759,8 @@ def get_active_batch(base_dir, registry_db):
 def finalize_active_batch(base_dir, registry_db):
     init_registry(base_dir, registry_db)
     old_batch = get_active_batch(base_dir, registry_db)
-    finalized_date = datetime.now().strftime(DATE_FORMAT)
+    finalized_date = mark_items_finalized(old_batch)
+    update_storage_excel_batch_column(old_batch, 7, finalized_date)
     conn = sqlite3.connect(registry_db)
     cur = conn.cursor()
     cur.execute("UPDATE batches SET finalized_at=? WHERE folder_path=?", (finalized_date, old_batch))
@@ -753,26 +772,30 @@ def finalize_active_batch(base_dir, registry_db):
 #=====DISPOSE BATCH=====
 def dispose_batch(batch_path, base_dir, registry_db):
     init_registry(base_dir, registry_db)
-    disposed_date = datetime.now().strftime(DATE_FORMAT)
-    conn = sqlite3.connect(registry_db)
-    cur = conn.cursor()
-    cur.execute("UPDATE batches SET disposed_at=? WHERE folder_path=? AND disposed_at IS NULL", (disposed_date, batch_path))
-    conn.commit()
-    conn.close()
+    disposed_date = mark_items_disposed(batch_path)
+    update_storage_excel_batch_column(batch_path, 8, disposed_date)
+    new_path = batch_path
     old_name = os.path.basename(batch_path)
     if not old_name.endswith("-DISPOSED"):
         new_name = f"{old_name}-DISPOSED"
         new_path = os.path.join(os.path.dirname(batch_path), new_name)
-        os.rename(batch_path, new_path)
-        batch_path = new_path
-    return batch_path
-
-#=====READ BATCH DATE INFO=====
-def read_batch_info(batch_path, base_dir, registry_db):
-    init_registry(base_dir, registry_db)
+        if os.path.exists(batch_path) and not os.path.exists(new_path):
+            os.rename(batch_path, new_path)
     conn = sqlite3.connect(registry_db)
     cur = conn.cursor()
-    row = cur.execute("SELECT created_at, finalized_at, disposed_at FROM batches WHERE folder_path=?", (batch_path,)).fetchone()
+    cur.execute("UPDATE batches SET disposed_at=?, folder_path=? WHERE folder_path=?", (disposed_date, new_path, batch_path))
+    conn.commit()
+    conn.close()
+    return new_path
+
+#=====READ BATCH DATE INFO=====
+def read_batch_info(batch_path, base_dir=None, registry_db=None):
+    db_path = os.path.join(batch_path, "storage.sqlite")
+    if not os.path.exists(db_path):
+        return None, None, None
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    row = cur.execute("SELECT MIN(batch_created_at), MAX(batch_finalized_at), MAX(batch_disposed_at) FROM stored_items").fetchone()
     conn.close()
     if not row:
         return None, None, None
@@ -791,34 +814,50 @@ def init_storage_files(batch_path):
                                                             stored_at TEXT,
                                                             activity_mci REAL,
                                                             permitted_date TEXT,
-                                                            recommended_date TEXT)""")
+                                                            recommended_date TEXT,
+                                                            batch_created_at TEXT,
+                                                            batch_finalized_at TEXT,
+                                                            batch_disposed_at TEXT)""")
+    cols = [r[1] for r in cur.execute("PRAGMA table_info(stored_items)").fetchall()]
+    for col in ["batch_created_at", "batch_finalized_at", "batch_disposed_at"]:
+        if col not in cols:
+            cur.execute(f"ALTER TABLE stored_items ADD COLUMN {col} TEXT")
     conn.commit()
     conn.close()
     if not os.path.exists(xlsx_path):
         wb = Workbook()
         ws = wb.active
         ws.title = "Stored Items"
-        ws.append(["ID", "Stored at", "Activity(mCi)", "Permitted Date", "Recommended Date"])
+        ws.append(["ID", "Stored at", "Activity(mCi)", "Permitted Date", "Recommended Date", "Batch Created At", "Batch Finalized At", "Batch Disposed At"])
         wb.save(xlsx_path)
     return db_path, xlsx_path
+
+def update_storage_excel_batch_column(batch_path, column, value):
+    xlsx_path = os.path.join(batch_path, "storage.xlsx")
+    wb = load_workbook(xlsx_path)
+    ws = wb["Stored Items"]
+    for r in range(2, ws.max_row + 1):
+        ws.cell(row=r, column=column, value=value)
+    wb.save(xlsx_path)
 
 #=====STORE TC99M ITEM IN SQLITE+XLSX=====
 def store_item(item_id, source_parent_id, item_label, kit_name, stored_at, activity_mci, *, radionuclide, base_dir, registry_db, permitted_date=None, recommended_date=None):
     batch_path = get_active_batch(base_dir, registry_db)
     db_path, xlsx_path = init_storage_files(batch_path)
+    created_at = datetime.now().strftime(DATE_FORMAT)
     if permitted_date is None or recommended_date is None:
-        recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=TC99M_NUCLIDE, activity_mci=float(activity_mci), stored_at=stored_at)
+        recommended_date, permitted_date, _ = calc_recommended_and_permitted_date(radionuclide=radionuclide, activity_mci=float(activity_mci), stored_at=stored_at)
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("INSERT OR IGNORE INTO stored_items (id, source_parent_id, item_label, kit_name, stored_at, activity_mci, permitted_date, recommended_date) VALUES (?,?,?,?,?,?,?,?)",
-                (item_id, str(source_parent_id), item_label, kit_name, stored_at, float(activity_mci), permitted_date, recommended_date))
+    cur.execute("INSERT OR IGNORE INTO stored_items (id, source_parent_id, item_label, kit_name, stored_at, activity_mci, permitted_date, recommended_date, batch_created_at, batch_finalized_at, batch_disposed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (item_id, str(source_parent_id), item_label, kit_name, stored_at, float(activity_mci), permitted_date, recommended_date, created_at, None, None))
     inserted = cur.rowcount
     conn.commit()
     conn.close()
     if inserted:
         wb = load_workbook(xlsx_path)
         ws = wb["Stored Items"]
-        ws.append([item_id, stored_at, float(activity_mci), permitted_date, recommended_date])
+        ws.append([item_id, stored_at, float(activity_mci), permitted_date, recommended_date, created_at, None, None])
         wb.save(xlsx_path)
     return item_id, batch_path
 
@@ -834,6 +873,26 @@ def read_items(batch_path=None, *, base_dir, registry_db):
     rows = cur.execute("SELECT id, item_label, stored_at, activity_mci, permitted_date, recommended_date FROM stored_items ORDER BY stored_at, id").fetchall()
     conn.close()
     return rows
+
+def mark_items_finalized(batch_path):
+    finalized_date = datetime.now().strftime(DATE_FORMAT)
+    db_path = os.path.join(batch_path, "storage.sqlite")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("UPDATE stored_items SET batch_finalized_at=?", (finalized_date,))
+    conn.commit()
+    conn.close()
+    return finalized_date
+
+def mark_items_disposed(batch_path):
+    disposed_date = datetime.now().strftime(DATE_FORMAT)
+    db_path = os.path.join(batch_path, "storage.sqlite")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("UPDATE stored_items SET batch_disposed_at=?", (disposed_date,))
+    conn.commit()
+    conn.close()
+    return disposed_date
 
 #====SYNC TC99M+GA68 GEN FOR DISPOSAL=====
 def ensure_elutions_disposal_columns(cur, conn):
