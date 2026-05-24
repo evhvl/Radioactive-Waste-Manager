@@ -215,6 +215,7 @@ def store_gen(*, conn, dbfile, excel_sheet="Gen Info", date_format=DATE_FORMAT, 
     ws = wb[excel_sheet]
     ws.cell(row=2, column=7).value = stored_date
     wb.save(excel_path)
+    wb.close()
     update_folder_status(folder, stored=True)
     messagebox.showinfo("Stored", f"Generator stored on {stored_date}.")
     if on_store_callback:
@@ -235,6 +236,7 @@ def dispose_gen(*, conn, dbfile, excel_sheet="Gen Info", date_format="%d-%m-%Y",
     ws = wb[excel_sheet]
     ws.cell(row=2, column=6).value = disposal_date
     wb.save(excel_path)
+    wb.close()
     update_folder_status(folder, disposed=True)
     messagebox.showinfo("Disposed", f"Generator disposed on {disposal_date}.")
     if on_disposed_callback:
@@ -475,7 +477,7 @@ def ensure_daily_log_workbook(xlsx_path: str):
         ws0 = wb.active
         wb.remove(ws0)
     vial_headers = ["Disposal Date", "Disposal Time", "Radionuclide", "Calibration Date", "Stored At", "Activity(mCi)",
-                   "Permitted Date", "Recommended Date", "Limit(mCi)", "Limit(Bq)"]
+                   "Permitted Date", "Recommended Date", "Fraction", "Limit(kBq/kg)", "Bag Mass(kg)"]
     for sheet_name in ("Vials",) :
         if sheet_name not in wb.sheetnames:
             ws = wb.create_sheet(sheet_name)
@@ -500,8 +502,9 @@ def ensure_daily_log_sqlite():
                                                               activity_mci REAL NOT NULL,
                                                               permitted_date TEXT,
                                                               recommended_date TEXT,
-                                                              limit_mci REAL,
-                                                              limit_bq REAL)""")
+                                                              limit_kbq_kg REAL,
+                                                              fraction REAL,
+                                                              bag_mass REAL)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS disposed_tc99m_batches (id INTEGER PRIMARY KEY AUTOINCREMENT,
                                                                       batch_id INTEGER NOT NULL,
                                                                       item_id TEXT NOT NULL,
@@ -526,6 +529,11 @@ def ensure_daily_log_sqlite():
                                                                       permitted_date TEXT,
                                                                       recommended_date TEXT,
                                                                       limit_kbq_kg REAL)""")
+    cols = [r[1] for r in cur.execute("PRAGMA table_info(disposed_vials)").fetchall()]
+    if "bag_mass" not in cols:
+        cur.execute("ALTER TABLE disposed_vials ADD COLUMN bag_mass REAL")
+    if "fraction" not in cols:
+        cur.execute("ALTER TABLE disposed_vials ADD COLUMN fraction REAL")
     for table in ("disposed_tc99m_batches", "disposed_ga68_batches", "disposed_lu177_batches"):
         cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
         if "limit_kbq_kg" not in cols:
@@ -533,7 +541,7 @@ def ensure_daily_log_sqlite():
     conn.commit()
     return conn
 
-def log_vials_disposal(vials_full_rows):
+def log_vials_disposal(vials_full_rows, *, bag_mass_kg=None, fraction=None):
     disp_date = datetime.now().strftime(DATE_FORMAT)
     disp_time = datetime.now().strftime(HOUR_FORMAT)
     xlsx_path = get_daily_disposal_excel_path(disp_date)
@@ -543,11 +551,12 @@ def log_vials_disposal(vials_full_rows):
     cur = conn.cursor()
     for r in vials_full_rows:
         (rid, radionuclide, source_db, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_bq, limit_mci) = r
+        limit_kbq_kg = DISPOSAL_LIMITS_KBQ_PER_KG.get(radionuclide)
         ws.append([disp_date, disp_time, radionuclide, calibration_date, stored_at, float(activity_mci), permitted_date, recommended_date,
-                   "" if limit_mci is None else float(limit_mci), "" if limit_bq is None else float(limit_bq)])
-        cur.execute("INSERT INTO disposed_vials (disposal_date, disposal_time, radionuclide, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_mci, limit_bq) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?)", (disp_date, disp_time, radionuclide, calibration_date, stored_at, float(activity_mci), permitted_date, recommended_date,
-                                                      "" if limit_mci is None else float(limit_mci), "" if limit_bq is None else float(limit_bq)))
+                   limit_kbq_kg, fraction, bag_mass_kg])
+        cur.execute("INSERT INTO disposed_vials (disposal_date, disposal_time, radionuclide, calibration_date, stored_at, activity_mci, permitted_date, recommended_date, limit_kbq_kg, fraction, bag_mass) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)", (disp_date, disp_time, radionuclide, calibration_date, stored_at, float(activity_mci), permitted_date, recommended_date,
+                                                      limit_kbq_kg, fraction, bag_mass_kg))
         mark_vial_as_disposed(source_db=source_db, disposed_date=disp_date)
     wb.save(xlsx_path)
     conn.commit()

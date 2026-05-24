@@ -237,7 +237,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
             if pdf_path is None:
                 return
             full_rows = read_vials_full_ids(ids)
-            log_vials_disposal(full_rows)
+            log_vials_disposal(full_rows, bag_mass_kg=mass_kg, fraction=total_fraction)
             delete_vials_by_ids(ids)
             popup.destroy()
             refresh()
@@ -312,8 +312,9 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
             if not messagebox.askyesno("Dispose Ga68 Batch", "Are you sure you want to dispose this Ga68 batch?\n\nNo table A kBq/kg limit is used for Ga68.\nThis action cannot be undone."):
                 return
             current_batch = state["batch_path"]
-            log_batch_disposal(current_batch, finalized_at, rows, radionuclide=nuclide_name)
             disposed_batch = dispose_batch(current_batch, base_dir, registry_db)
+            created_at, finalized_at, disposed_at = read_batch_info(disposed_batch)
+            log_batch_disposal(disposed_batch, finalized_at, rows, radionuclide=nuclide_name)
             new_batch = create_new_batch_folder(base_dir, registry_db)
             conn = sqlite3.connect(registry_db)
             cur = conn.cursor()
@@ -440,7 +441,7 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
             return
         old_batch, new_batch = finalize_active_batch(base_dir=base_dir, registry_db=registry_db)
         messagebox.showinfo("Batch Finalized", f"Old batch closed:\n{os.path.basename(old_batch)}\n\nNew active batch:\n\n{os.path.basename(new_batch)}")
-        load_batch(new_batch, read_only=True)
+        load_batch(new_batch, read_only=False)
     btns = Frame(parent_tab, bg=C4)
     btns.pack(pady=(10,15))
     Button(btns, text="Refresh", **{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']}, width=12, height=1, font=(FONT_NAME, 12, "bold"), command=refresh).grid(row=0, column=0, padx=6)
