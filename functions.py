@@ -739,6 +739,28 @@ def delete_vials_by_ids(ids):
     except Exception:
         pass
 
+#=====GROUP READY VIALS=====
+def calc_bag_clearance_smart(ready_items, mass_kg):
+    mass_kg = float(mass_kg)
+    enriched = []
+    for it in ready_items:
+        nuclide = it["radionuclide"]
+        limit = DISPOSAL_LIMITS_KBQ_PER_KG[nuclide]
+        frac = (mci_to_kbq(it["activity_now"]) / mass_kg) / float(limit)
+        enriched.append((frac,it))
+    enriched.sort(key=lambda x: x[0])
+    selected = []
+    skipped = []
+    total_fraction = 0.0
+    for frac, it in enriched:
+        if total_fraction + frac < 1.0:
+            selected.append(it)
+            total_fraction += frac
+        else:
+            skipped.append(it)
+    details, _, _ = calc_bag_clearance(selected, mass_kg)
+    return details, total_fraction, selected, skipped
+
 #=====TC99M SQLITE CREATE TABLES=====
 def init_registry(base_dir, registry_db):
     ensure_dir(base_dir)

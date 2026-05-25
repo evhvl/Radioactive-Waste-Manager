@@ -101,11 +101,11 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
         if mass_kg is None:
             return
         try:
-            clearance_details, total_fraction, is_clearable = calc_bag_clearance(ready_items, mass_kg)
+            clearance_details, total_fraction, selected_items, skipped_items = calc_bag_clearance_smart(ready_items, mass_kg)
         except Exception as e:
             messagebox.showerror("Clearance Calculation Error", str(e))
             return
-        if not is_clearable:
+        if not selected_items:
             lines = [
                 "READY vials exist, but this bag cannot be disposed together.",
                 "",
@@ -114,6 +114,8 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
             ]
             messagebox.showwarning("Not clearable", "\n".join(lines))
             return
+        if skipped_items:
+            messagebox.showwarning("Partial Clearance", f"Only {len(selected_items)}/{len(ready_items)} READY Vials can be disposed.\n\n{len(skipped_items)} vials were skipped to keep Σ fractions < 1.\n\nΣ fractions: {total_fraction:.4f}")
         eligible = {}
         for d in clearance_details:
             nucl = d["radionuclide"]
