@@ -190,6 +190,16 @@ def build_tab(app, tab, vial_name):
         Label(info_frame, text=f"T1/2 {vial_name} (HR): {half_life}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=1, padx=6, pady=6)
         Label(info_frame, text=f"Expiration Date: {exp_date}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=1, padx=6, pady=6)
 
+        #=====Refresh=====
+        def refresh_vial_ui_after_store(stored_at):
+            header.config(
+                text=f"⚠ VIAL STORED ({stored_at}) – NO FURTHER ACTIONS ALLOWED",
+                fg="#CC0000",
+                highlightthickness=0,
+                font=(FONT_NAME, 23, "bold")
+            )
+            disable_buttons(tab, exempt_texts=["Back"])
+
         # =====Store Vial=====
         def store_current_vial():
             if not messagebox.askyesno("Store Vial","Are you sure you want to store this vial for disposal?\nNo further administrations will be allowed."):
@@ -279,6 +289,8 @@ def build_tab(app, tab, vial_name):
             ws = wb["Vial Info"]
             ws.cell(row=2, column=7, value=stored_at)
             wb.save(excel_path)
+            wb.close()
+            refresh_vial_ui_after_store(stored_at)
             messagebox.showinfo("Vial Stored",f"{vial_name} vial stored successfully in {msg_storage}.\n\nRecommended disposal after: {recommended}\nPermitted disposal after: {permitted}")
 
         dispose_button = Button(info_frame, text="✗Store Vial✗",**{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
