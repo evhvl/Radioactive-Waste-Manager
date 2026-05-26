@@ -839,6 +839,7 @@ def dispose_batch(batch_path, base_dir, registry_db):
 
 #=====READ BATCH DATE INFO=====
 def read_batch_info(batch_path, base_dir=None, registry_db=None):
+    init_storage_files(batch_path)
     db_path = os.path.join(batch_path, "storage.sqlite")
     if not os.path.exists(db_path):
         return None, None, None
