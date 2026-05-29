@@ -207,7 +207,7 @@ def build_tab(app, tab):
                 return
             if is_stored_db and not is_disposed_db:
                 action_button.config(text="✗Dispose Gen✗", state="normal", command=lambda: dispose_gen(conn=conn, dbfile=dbfile, on_disposed_callback=lambda: (update_header_and_disable(cur=cur, header=header, tab=tab, is_disposed=True), configure_action_button())))
-                update_header_and_disable(cur=cur, header=header, tab=tab, is_stored=is_stored_db, is_disposed=True, is_expired=is_expired_db)
+                update_header_and_disable(cur=cur, header=header, tab=tab, is_stored=is_stored_db, is_disposed=False, is_expired=is_expired_db)
                 return
         # Elutions Table
         columns = [("date", "Date", 150), ("time", "Time", 150), ("activity", "Activity(mCi)", 180),

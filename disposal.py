@@ -348,7 +348,6 @@ def build_generator_disposal_tab(parent_tab, *, on_back=None, nuclide_name, nucl
         created_at, finalized_at, disposed_at = read_batch_info(disposed_batch)
         log_batch_disposal(disposed_batch, finalized_at, rows, radionuclide=nuclide_constant)
         messagebox.showinfo("Disposed", "Batch marked as disposed.")
-        refresh()
         load_batch(disposed_batch, read_only=True)
     def load_batch(batch_path, read_only=False):
         state["batch_path"] = batch_path

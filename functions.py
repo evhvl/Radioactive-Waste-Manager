@@ -1,4 +1,3 @@
-import time
 from datetime import datetime, timedelta
 from typing import Optional
 from openpyxl.styles import Alignment, Font
@@ -216,7 +215,6 @@ def store_gen(*, conn, dbfile, excel_sheet="Gen Info", date_format=DATE_FORMAT, 
     ws.cell(row=2, column=7).value = stored_date
     wb.save(excel_path)
     wb.close()
-    update_folder_status(folder, stored=True)
     messagebox.showinfo("Stored", f"Generator stored on {stored_date}.")
     if on_store_callback:
         on_store_callback()
@@ -234,10 +232,9 @@ def dispose_gen(*, conn, dbfile, excel_sheet="Gen Info", date_format="%d-%m-%Y",
     excel_path = os.path.join(folder, f"{os.path.basename(folder)}.xlsx")
     wb = load_workbook(excel_path)
     ws = wb[excel_sheet]
-    ws.cell(row=2, column=6).value = disposal_date
+    ws.cell(row=2, column=8).value = disposal_date
     wb.save(excel_path)
     wb.close()
-    update_folder_status(folder, disposed=True)
     messagebox.showinfo("Disposed", f"Generator disposed on {disposal_date}.")
     if on_disposed_callback:
         on_disposed_callback()
