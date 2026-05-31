@@ -1,6 +1,6 @@
 from tkinter import Label, filedialog, ttk, Toplevel, simpledialog
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from functions import *
@@ -22,7 +22,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
         tree.column(col_name, anchor="center", width=col_width, stretch=False)
     style = ttk.Style()
     style.theme_use("default")
-    style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", font=(FONT_NAME, 12), rowheight=26, borderwidth=1, bordercolor="black", relief="solid")
+    style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", font=(FONT_NAME, 12), rowheight=28, borderwidth=1, bordercolor="black", relief="solid")
     style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 14, "bold"), relief="solid")
     style.map("Treeview", background=[("selected", "#8FAADC"), ("!selected", C2)], foreground=[("selected", "black")])
     style.layout("Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
@@ -84,8 +84,11 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
                 if status != "READY":
                     continue
                 a_now = activity_now(radionuclide, stored_at, activity0)
+                batch_number, serial_number = get_vial_batch_serial(source_db)
                 ready_items.append({"id": int(rid),
                                     "radionuclide": radionuclide,
+                                    "batch_number": batch_number,
+                                    "serial_number": serial_number,
                                     "cal_date": cal_date,
                                     "stored_at": stored_at,
                                     "activity0": float(activity0),
@@ -181,7 +184,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
                 disp_date = datetime.now().strftime(DATE_FORMAT)
                 pdf_path = get_ready_vials_pdf_path(disp_date)
                 styles = getSampleStyleSheet()
-                doc = SimpleDocTemplate(pdf_path, pagesize=A4)
+                doc = SimpleDocTemplate(pdf_path, pagesize=landscape(A4), leftMargin=25, rightMargin=25, topMargin=30, bottomMargin=25)
                 story = []
                 story.append(Paragraph(f"READY Vials Eligible for Disposal - {disp_date}", styles["Title"]))
                 story.append(Spacer(1, 10))
@@ -199,9 +202,11 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
                                            f"C(kBq/kg): {g['concentration_kbq_kg']:.4f} kBq/kg | Fraction: {g['fraction']:.4f} | Count: {len(g['items'])}",
                                             styles["Heading2"]))
                     story.append(Spacer(1, 6))
-                    data = [["Cal Date", "Cal Activity (mCi)", "Stored at", "A0 (mCi)", "Activity Now (mCi)", "Permitted"]]
+                    data = [["Batch No", "Serial No", "Cal Date", "Cal Activity (mCi)", "Stored at", "A0 (mCi)", "Activity Now (mCi)", "Permitted"]]
                     for it in g["items"]:
-                        data.append([str(it["cal_date"]),
+                        data.append([str(it.get("batch_number", "")),
+                                     str(it.get("serial_number", "")),
+                                     str(it["cal_date"]),
                                      "" if it.get("cal_activity") is None else f"{float(it['cal_activity']):.2f}",
                                      str(it["stored_at"]),
                                      f"{it['activity0']:.2f}",
@@ -210,6 +215,7 @@ def build_vials_disposal_tab(parent_tab, *, on_back=None, only_radionuclide=None
                     tbl = Table(data, hAlign="LEFT")
                     tbl.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
                                             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                                            ("FONTSIZE", (0, 0), (-1, -1), 12),
                                             ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                                             ("ALIGN", (3, 1), (-2, -1), "RIGHT")]))
                     story.append(tbl)

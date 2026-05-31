@@ -6,7 +6,6 @@ from tkinter import *
 from tkinter import ttk, messagebox, filedialog
 from tkcalendar import DateEntry
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 def build_tab(app, tab, vial_name):
@@ -35,16 +34,24 @@ def build_tab(app, tab, vial_name):
         popup = Toplevel(app.window)
         popup.title(f"New {vial_name} Vial")
         popup.config(bg=C4)
-        center_window(window=popup, w=420, h=320)
+        center_window(window=popup, w=420, h=380)
         Label(popup, text=f"New {vial_name} Vial Info", **TEXT_COLORS, font=(FONT_NAME, 20, "bold")).pack(pady=10)
         info_frame = Frame(popup, bg=C4)
         info_frame.pack(pady=10)
-        Label(info_frame, text="Calibration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Batch Number:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        batch_entry = Entry(info_frame, width=14)
+        batch_entry.grid(row=0, column=1, pady=5)
+        batch_entry.insert(0, "-")
+        Label(info_frame, text="Serial Number:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        serial_entry = Entry(info_frame, width=14)
+        serial_entry.grid(row=1, column=1, pady=5)
+        serial_entry.insert(0, "-")
+        Label(info_frame, text="Calibration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=2, column=0, sticky="e", padx=5, pady=5)
         date_entry = DateEntry(info_frame, width=12, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
-        date_entry.grid(row=0, column=1, pady=5)
+        date_entry.grid(row=2, column=1, pady=5)
         time_field = Frame(info_frame, bg="white", highlightbackground="black", highlightthickness=0)
-        time_field.grid(row=1, column=1, padx=5)
-        Label(info_frame, text="Calibration Time:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        time_field.grid(row=3, column=1, padx=5)
+        Label(info_frame, text="Calibration Time:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=3, column=0, sticky="e", padx=5, pady=5)
         time_entry = Entry(time_field, width=9, bd=0, font=(FONT_NAME, 10))
         time_entry.pack(side="left", padx=(3, 0), pady=2)
         update_time(time_entry)
@@ -52,18 +59,20 @@ def build_tab(app, tab, vial_name):
                                      fg="black", bd=0,
                                      padx=3, pady=0, font=(FONT_NAME, 10), cursor="hand2")
         refresh_time_button.pack(side="right", padx=3)
-        Label(info_frame, text="Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        Label(info_frame, text="Activity (mCi):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=4, column=0, sticky="e", padx=5, pady=5)
         activity_entry = Entry(info_frame, width=14)
-        activity_entry.grid(row=2, column=1, pady=5)
-        Label(info_frame, text="Volume (ml):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=3, column=0, sticky="e", padx=5, pady=5)
+        activity_entry.grid(row=4, column=1, pady=5)
+        Label(info_frame, text="Volume (ml):", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=5, column=0, sticky="e", padx=5, pady=5)
         volume_entry = Entry(info_frame, width=14)
-        volume_entry.grid(row=3, column=1, pady=5)
-        Label(info_frame, text="Expiration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=4, column=0, sticky="e", padx=5, pady=5)
+        volume_entry.grid(row=5, column=1, pady=5)
+        Label(info_frame, text="Expiration Date:", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=6, column=0, sticky="e", padx=5, pady=5)
         expiration_entry = DateEntry(info_frame, width=12, bg=C3, fg="white", date_pattern="dd-mm-yyyy")
-        expiration_entry.grid(row=4, column=1, pady=5)
+        expiration_entry.grid(row=6, column=1, pady=5)
 
         def save_new_vial_file():
             fields = {
+                "Batch Number": batch_entry,
+                "Serial Number": serial_entry,
                 "Date": date_entry,
                 "Time": time_entry,
                 "Activity(mCi)": activity_entry,
@@ -84,6 +93,8 @@ def build_tab(app, tab, vial_name):
                 messagebox.showerror("Error", "Activity & Volume must be numbers!")
                 return
             conc = round(activity / volume, 2)
+            batch_number = batch_entry.get().strip()
+            serial_number = serial_entry.get().strip()
             cal_date = date_entry.get()
             cal_time = time_entry.get()
             exp_date = expiration_entry.get()
@@ -107,15 +118,15 @@ def build_tab(app, tab, vial_name):
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
             cur.execute(
-                """CREATE TABLE IF NOT EXISTS vial_info(cal_date TEXT, cal_time TEXT, activity REAL, volume REAL, concentration REAL, expiration_date TEXT, stored_date TEXT, disposal_date TEXT)""")
+                """CREATE TABLE IF NOT EXISTS vial_info(batch_number TEXT, serial_number TEXT, cal_date TEXT, cal_time TEXT, activity REAL, volume REAL, concentration REAL, expiration_date TEXT, stored_date TEXT, disposal_date TEXT)""")
             cur.execute(
                 """CREATE TABLE IF NOT EXISTS patient_info(id INTEGER PRIMARY KEY AUTOINCREMENT, cal_date TEXT, cal_time TEXT, patient_name TEXT, concentration REAL, dose_planned REAL, volume_planned REAL, dose_actual REAL, volume_actual REAL, volume_left REAL)""")
-            cur.execute("""INSERT INTO vial_info VALUES (?,?,?,?,?,?,NULL,NULL)""",
-                        (cal_date, cal_time, activity, volume, conc, exp_date))
+            cur.execute("""INSERT INTO vial_info VALUES (?,?,?,?,?,?,?,?,NULL,NULL)""",
+                        (batch_number, serial_number, cal_date, cal_time, activity, volume, conc, exp_date))
             conn.commit()
             conn.close()
             create_excel_for_vial(excel_path)
-            append_row_to_sheet(excel_path, "Vial Info", [cal_date, cal_time, activity, volume, conc, exp_date, "", ""])
+            append_row_to_sheet(excel_path, "Vial Info", [batch_number, serial_number, cal_date, cal_time, activity, volume, conc, exp_date, "", ""])
             popup.destroy()
             load_vial(db_path)
 
@@ -167,8 +178,10 @@ def build_tab(app, tab, vial_name):
         header = Label(tab, text=f"{vial_name} Log Sheet", **TEXT_COLORS, font=(FONT_NAME, 25, "bold"))
         header.pack(pady=(5, 0), fill="x")
         conn = sqlite3.connect(dbfile)
+        ensure_vial_info_columns(conn)
         cur = conn.cursor()
-        date, time, activity, volume, conc, exp_date, stored_date, disposal_date = cur.execute("SELECT * FROM vial_info").fetchone()
+        row = cur.execute("SELECT cal_date, cal_time, activity, volume, concentration, expiration_date, stored_date, disposal_date, batch_number, serial_number FROM vial_info LIMIT 1").fetchone()
+        (date, time, activity, volume, conc, exp_date, stored_date, disposal_date, batch_number, serial_number) = row
         exp_dt = datetime.strptime(exp_date, "%d-%m-%Y")
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         is_stored = False
@@ -184,11 +197,13 @@ def build_tab(app, tab, vial_name):
         half_life = next(hl for name, hl in VIAL_DATA if name == vial_name)
         info_frame = Frame(tab, bg=C4)
         info_frame.pack(anchor="center", pady=20)
-        Label(info_frame, text=f"Calibration on: {date} {time}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=0, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Activity (mCi): {activity}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"Conc (mCi/ml): {conc}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=2, column=0, padx=6, pady=6)
-        Label(info_frame, text=f"T1/2 {vial_name} (HR): {half_life}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=0, column=1, padx=6, pady=6)
-        Label(info_frame, text=f"Expiration Date: {exp_date}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=1, padx=6, pady=6)
+        Label(info_frame, text=f"Batch Number: {batch_number}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=0, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Serial Number: {serial_number}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=1, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Calibration on: {date} {time}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=2, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Activity (mCi): {activity}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=3, column=0, padx=6, pady=6)
+        Label(info_frame, text=f"Conc (mCi/ml): {conc}", **TEXT_COLORS, font=(FONT_NAME, 12, "bold")).grid(row=0, column=1, padx=6, pady=6)
+        Label(info_frame, text=f"T1/2 {vial_name} (HR): {half_life}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=1, column=1, padx=6, pady=6)
+        Label(info_frame, text=f"Expiration Date: {exp_date}", **TEXT_COLORS, font=(FONT_NAME, 12)).grid(row=2, column=1, padx=6, pady=6)
 
         #=====Refresh=====
         def refresh_vial_ui_after_store(stored_at):
@@ -295,7 +310,7 @@ def build_tab(app, tab, vial_name):
 
         dispose_button = Button(info_frame, text="✗Store Vial✗",**{k: v for k, v in TAB_BUTTON_STYLE.items() if k not in ['width', 'height', 'font']},
                                 width=14, height=1, font=(FONT_NAME, 12, "bold"), command=store_current_vial)
-        dispose_button.grid(row=2, column=1, padx=6, pady=6)
+        dispose_button.grid(row=3, column=1, padx=6, pady=6)
 
         # Table
         columns = [("cal_date", "Date", 150), ("cal_time", "Time", 120), ("patient_name", "Patient", 180),
@@ -308,7 +323,7 @@ def build_tab(app, tab, vial_name):
             tree.column(col_id, width=col_width, anchor="center")
         style = ttk.Style()
         style.theme_use("default")
-        style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", font=(FONT_NAME,12), rowheight=26, borderwidth=1,
+        style.configure("Treeview", background=C2, fieldbackground=C2, foreground="black", font=(FONT_NAME,12), rowheight=22, borderwidth=1,
                         bordercolor="black", relief="solid")
         style.configure("Treeview.Heading", background=C3, foreground="white", font=(FONT_NAME, 14, "bold"),
                         relief="solid")

@@ -51,7 +51,7 @@ def create_excel_for_vial(excel_path):
     wb = Workbook()
     ws_info = wb.active
     ws_info.title = "Vial Info"
-    ws_info.append(["Calibration Date", "Calibration Time", "Activity(mCi)", "Volume(ml)", "Concentration(mCi/ml)", "Expiration Date", "Stored Date", "Disposal Date"])
+    ws_info.append(["Batch Number", "Serial Number", "Calibration Date", "Calibration Time", "Activity(mCi)", "Volume(ml)", "Concentration(mCi/ml)", "Expiration Date", "Stored Date", "Disposal Date"])
     ws_admin = wb.create_sheet("Administrations")
     ws_admin.append(["ID", "Date", "Time", "Patient Name", "Concentration(mCi/ml)", "Dose(mCi)", "Volume(ml)", "Volume Left(ml)"])
     wb.save(excel_path)
@@ -278,6 +278,16 @@ def get_float(value, default=None):
     except (ValueError, TypeError):
         return default
 
+#=====ADD BATCH AND SERIAL COLS IN SQL=====
+def ensure_vial_info_columns(conn):
+    cur = conn.cursor()
+    cols = [r[1] for r in cur.execute("PRAGMA table_info(vial_info)").fetchall()]
+    if "batch_number" not in cols:
+        cur.execute("ALTER TABLE vial_info ADD COLUMN batch_number TEXT")
+    if "serial_number" not in cols:
+        cur.execute("ALTER TABLE vial_info ADD COLUMN serial_number TEXT")
+    conn.commit()
+
 #=====MARK FOLDERS AS STORED/DISPOSED=====
 def update_folder_status(path, *, stored=False, disposed=False):
     try:
@@ -299,6 +309,19 @@ def update_folder_status(path, *, stored=False, disposed=False):
     except Exception as e:
         messagebox.showerror("Error", f"Folder rename error: {e}")
         return path
+
+#=====PDF HELPER=====
+def get_vial_batch_serial(source_db):
+    try:
+        conn = sqlite3.connect(source_db)
+        cur = conn.cursor()
+        row = cur.execute("SELECT batch_number, serial_number FROM vial_info ORDER BY rowid DESC LIMIT 1").fetchone()
+        conn.close()
+        if row:
+            return row[0], row[1]
+    except Exception:
+        pass
+    return "", ""
 
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
@@ -527,6 +550,8 @@ def ensure_daily_log_sqlite():
                                                                       recommended_date TEXT,
                                                                       limit_kbq_kg REAL)""")
     cols = [r[1] for r in cur.execute("PRAGMA table_info(disposed_vials)").fetchall()]
+    if "limit_kbq_kg" not in cols:
+        cur.execute("ALTER TABLE disposed_vials ADD COLUMN limit_kbq_kg REAL")
     if "bag_mass" not in cols:
         cur.execute("ALTER TABLE disposed_vials ADD COLUMN bag_mass REAL")
     if "fraction" not in cols:
